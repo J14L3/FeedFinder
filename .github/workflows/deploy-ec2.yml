@@ -21,10 +21,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (EC2 base path)
-        env:
-          VITE_BASE_PATH: '/'
-        run: npm run build
+      - name: Build (force base '/')
+        run: npx vite build --base=/
 
       - name: Add SPA fallback (404.html)
         run: cp dist/index.html dist/404.html
