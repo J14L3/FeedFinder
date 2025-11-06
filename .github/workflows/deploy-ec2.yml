@@ -1,0 +1,64 @@
+name: Deploy to EC2 (Nginx)
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (EC2 base path)
+        env:
+          VITE_BASE_PATH: '/'
+        run: npm run build
+
+      - name: Add SPA fallback (404.html)
+        run: cp dist/index.html dist/404.html
+
+      - name: Write version stamp
+        run: echo "$GITHUB_SHA" > dist/__version.txt
+
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Rsync dist to EC2 temp dir
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
+            dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/feedfinder-dist/
+
+      - name: Atomic publish to webroot
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "\
+            sudo mkdir -p ${{ secrets.EC2_PATH }} && \
+            sudo rm -rf ${{ secrets.EC2_PATH }}.next && \
+            sudo mkdir -p ${{ secrets.EC2_PATH }}.next && \
+            sudo cp -r /tmp/feedfinder-dist/* ${{ secrets.EC2_PATH }}.next/ && \
+            sudo rm -rf ${{ secrets.EC2_PATH }}.bak && \
+            sudo mv ${{ secrets.EC2_PATH }} ${{ secrets.EC2_PATH }}.bak 2>/dev/null || true && \
+            sudo mv ${{ secrets.EC2_PATH }}.next ${{ secrets.EC2_PATH }} && \
+            sudo chown -R www-data:www-data ${{ secrets.EC2_PATH }} && \
+            sudo find ${{ secrets.EC2_PATH }} -type d -exec chmod 755 {} + && \
+            sudo find ${{ secrets.EC2_PATH }} -type f -exec chmod 644 {} + \
+          "
+
+      - name: Print deployed version URL
+        run: |
+          echo "Deployed: http://${{ secrets.EC2_HOST }}/__version.txt"
+
