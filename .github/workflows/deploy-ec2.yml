@@ -43,19 +43,16 @@ jobs:
             -e "ssh -i key.pem -o StrictHostKeyChecking=no" \
             dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/feedfinder-dist/
 
-      - name: Atomic publish to webroot
+      - name: Atomic publish to webroot (no sudo)
         run: |
           ssh -i key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "\
-            sudo mkdir -p ${{ secrets.EC2_PATH }} && \
-            sudo rm -rf ${{ secrets.EC2_PATH }}.next && \
-            sudo mkdir -p ${{ secrets.EC2_PATH }}.next && \
-            sudo cp -r /tmp/feedfinder-dist/* ${{ secrets.EC2_PATH }}.next/ && \
-            sudo rm -rf ${{ secrets.EC2_PATH }}.bak && \
-            sudo mv ${{ secrets.EC2_PATH }} ${{ secrets.EC2_PATH }}.bak 2>/dev/null || true && \
-            sudo mv ${{ secrets.EC2_PATH }}.next ${{ secrets.EC2_PATH }} && \
-            sudo chown -R www-data:www-data ${{ secrets.EC2_PATH }} && \
-            sudo find ${{ secrets.EC2_PATH }} -type d -exec chmod 755 {} + && \
-            sudo find ${{ secrets.EC2_PATH }} -type f -exec chmod 644 {} + \
+            mkdir -p ${{ secrets.EC2_PATH }} && \
+            rm -rf ${{ secrets.EC2_PATH }}.next && \
+            mkdir -p ${{ secrets.EC2_PATH }}.next && \
+            cp -r /tmp/feedfinder-dist/* ${{ secrets.EC2_PATH }}.next/ && \
+            rm -rf ${{ secrets.EC2_PATH }}.bak && \
+            mv ${{ secrets.EC2_PATH }} ${{ secrets.EC2_PATH }}.bak 2>/dev/null || true && \
+            mv ${{ secrets.EC2_PATH }}.next ${{ secrets.EC2_PATH }} \
           "
 
       - name: Print deployed version URL
