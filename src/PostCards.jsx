@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, MessageCircle, Share2, Star, DollarSign, Lock, Crown, FileText } from 'lucide-react';
+import { Star, DollarSign, Lock, Crown, FileText } from 'lucide-react';
 
 // Simple URL allowlist for images to reduce risk of scriptable URLs
 const isSafeImageUrl = (url) => {
@@ -9,7 +9,7 @@ const isSafeImageUrl = (url) => {
 
 const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = false, isPremium = false }) => {
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition mb-4">
+    <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition mb-8 border-2 border-gray-200">
       {/* Author Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -139,19 +139,7 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
       {/* Caption & Actions */}
       <div className="p-4">
         <p className="text-gray-800 mb-3">{post.caption}</p>
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 hover:text-red-500 transition">
-              <Heart size={22} className="text-gray-600" /> <span className="font-medium">{post.likes}</span>
-            </button>
-            <button className="flex items-center gap-2 hover:text-blue-500 transition">
-              <MessageCircle size={22} className="text-gray-600" /> <span className="font-medium">{post.comments}</span>
-            </button>
-            <button className="flex items-center gap-2 hover:text-green-500 transition">
-              <Share2 size={22} className="text-gray-600" />
-            </button>
-          </div>
-
+        <div className="flex items-center justify-end pt-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <button 
               onClick={() => isLoggedIn ? setShowRatingModal(post) : window.alert('Please login to rate profiles')} 
