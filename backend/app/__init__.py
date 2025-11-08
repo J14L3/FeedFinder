@@ -9,7 +9,7 @@ from itsdangerous import URLSafeTimedSerializer
 
 
 # Load .env file from specific path
-dotenv_path = '/home/ubuntu/email.env'
+dotenv_path = '/home/student3/email.env'
 load_dotenv(dotenv_path)
 
 # Update Flask config from environment variables
