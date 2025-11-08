@@ -31,7 +31,26 @@ const FeedFinder = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const userMenuRef = useRef(null);
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { verifySession } = await import('./authService');
+        const user = await verifySession();
+        if (user) {
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -149,6 +168,18 @@ const FeedFinder = () => {
     post.author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.caption.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show login/register page if not logged in
   if (!isLoggedIn) {
@@ -270,13 +301,27 @@ const FeedFinder = () => {
                       </button>
                     )}
                     <hr className="my-2" />
-                    <button
-                      onClick={() => setIsLoggedIn(false)}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
-                    >
-                      <LogOut size={18} />
-                      Logout
-                    </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { logout } = await import('./authService');
+                              const success = await logout();
+                              if (success) {
+                                setIsLoggedIn(false);
+                                setShowUserMenu(false);
+                              }
+                            } catch (error) {
+                              console.error('Error logging out:', error);
+                              // Still logout locally even if API call fails
+                              setIsLoggedIn(false);
+                              setShowUserMenu(false);
+                            }
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                        >
+                          <LogOut size={18} />
+                          Logout
+                        </button>
                   </div>
                 )}
               </div>

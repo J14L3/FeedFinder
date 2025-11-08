@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, LogIn, User, Lock } from 'lucide-react';
-import { API_BASE } from './config';
+import { login } from './authService';
 
 const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -8,20 +8,22 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    // Fetch CSRF token on component mount
+    import('./authService').then(({ fetchCSRFToken }) => {
+      fetchCSRFToken();
+    });
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
     
     try {
-      const res = await fetch(`${API_BASE}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
+      const { success, data } = await login(form.username, form.password);
       
-      if (res.ok) {
+      if (success) {
         setMessage(data.message || "Login successful!");
         setIsError(false);
         // Set logged in after a short delay

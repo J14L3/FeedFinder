@@ -1,8 +1,12 @@
 from app import app
-from flask import render_template, request, redirect, url_for, flash, session, jsonify
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from app.hash import hash_password, verify_password
-from app.db import get_db_connection
+from app.db import get_db_connection, create_query_executor
+from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, cleanup_expired_sessions
+from app.auth_middleware import require_auth, optional_auth, set_auth_cookies, clear_auth_cookies, get_token_from_request
+from app.csrf import generate_csrf_token, require_csrf
 import re
+import os
 from itsdangerous import URLSafeTimedSerializer
 from app.two_factor import initiate_2fa, verify_2fa_code
 
@@ -44,9 +48,9 @@ def login():
             return render_template('login.html')
         
         try:
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM user WHERE user_name=%s", (username,))
-            user = cursor.fetchone()
+            db_query = create_query_executor(connection, dictionary=True)
+            db_query.execute("SELECT * FROM user WHERE user_name=%s", (username,))
+            user = db_query.fetchone()
 
             if user is None:
                 flash("Username not found.", "danger")
@@ -77,8 +81,8 @@ def login():
             return render_template('login.html')
 
         finally:
-            if cursor:
-                cursor.close()
+            if db_query:
+                db_query.close()
             if connection:
                 connection.close()
 
@@ -87,65 +91,92 @@ def login():
     return render_template('login.html', result=result)
 
 @app.route('/api/login', methods=['POST'])
+@require_csrf
 def api_login():
+    """
+    Login endpoint with session token creation.
+    Creates secure session tokens and sets them in HttpOnly cookies.
+    """
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
 
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM user WHERE user_name=%s", (username,))
-    user = cursor.fetchone()
-    cursor.close()
-    connection.close()
-
-    if not user or not verify_password(user['password_hash'], password):
-        return jsonify({"message": "Invalid username or password"}), 401
-
-    return jsonify({"message": f"Welcome {username}!"})
-
-
-    data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
-    code = data.get("code")  # optional 2FA code
-
     if not username or not password:
-        return jsonify({"success": False, "message": "Username and password required"}), 400
+        return jsonify({
+            "success": False,
+            "message": "Username and password are required"
+        }), 400
 
-    # 1️⃣ Validate username/password
+    # Validate username format
+    USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
+    if not USERNAME_RE.match(username):
+        return jsonify({
+            "success": False,
+            "message": "Invalid username format"
+        }), 400
+
     connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM user WHERE user_name=%s", (username,))
-    user = cursor.fetchone()
-    cursor.close()
-    connection.close()
+    if not connection:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed"
+        }), 500
 
-    if not user or not verify_password(user['password_hash'], password):
-        return jsonify({"success": False, "message": "Invalid username or password"}), 401
+    try:
+        db_query = connection.cursor(dictionary=True)
+        db_query.execute("SELECT * FROM user WHERE user_name=%s", (username,))
+        user = db_query.fetchone()
+        db_query.close()
+        connection.close()
 
-    # 2️⃣ If 2FA was already initiated, verify the code
-    if "2fa_code" in session and session.get("2fa_email") == user["user_email"]:
-        if not code:
-            return jsonify({"success": False, "two_factor": True, "message": "2FA code required"})
+        if not user or not verify_password(user['password_hash'], password):
+            return jsonify({
+                "success": False,
+                "message": "Invalid username or password"
+            }), 401
+
+        # Get client info for session security
+        ip_address = request.remote_addr or '0.0.0.0'
+        user_agent = request.headers.get('User-Agent', '')
         
-        valid, msg = verify_2fa_code(code)
-        if not valid:
-            return jsonify({"success": False, "message": msg}), 400
-        
-        # Success: clean up 2FA session data and mark user as logged in
-        session.pop("2fa_code", None)
-        session.pop("2fa_timestamp", None)
-        session.pop("2fa_email", None)
-        session["user"] = user["user_name"]
+        # Create session and generate tokens
+        access_token, refresh_token, session_id = create_session(
+            user['user_id'],
+            user['user_name'],
+            ip_address,
+            user_agent
+        )
 
-        return jsonify({"success": True, "message": f"Welcome, {username}!"})
+        if not access_token:
+            return jsonify({
+                "success": False,
+                "message": "Failed to create session"
+            }), 500
 
-    # 3️⃣ If 2FA not initiated yet, start it
-    initiate_2fa(user["user_email"])
-    session["pending_user"] = user["user_name"]
+        # Create response with tokens in cookies
+        response = make_response(jsonify({
+            "success": True,
+            "message": f"Welcome {username}!",
+            "user": {
+                "id": user['user_id'],
+                "username": user['user_name'],
+                "email": user.get('user_email', '')
+            }
+        }))
 
-    return jsonify({"success": False, "two_factor": True, "message": "2FA code sent to your email"})
+        # Set secure cookies
+        response = set_auth_cookies(response, access_token, refresh_token)
+
+        return response, 200
+
+    except Exception as e:
+        print(f"Login error: {e}")
+        if connection:
+            connection.close()
+        return jsonify({
+            "success": False,
+            "message": "An error occurred during login"
+        }), 500
 
 @app.route('/verify_2fa', methods=['GET', 'POST'])
 def verify_2fa():
@@ -168,19 +199,110 @@ def verify_2fa():
     return render_template('verify_2fa.html')
 
 
-    data = request.get_json()
-    code = data.get('code')
+@app.route('/api/logout', methods=['POST'])
+@require_auth
+def api_logout():
+    """
+    Logout endpoint that invalidates the current session.
+    """
+    try:
+        session_id = request.session_id
+        user_id = request.user_id
+        
+        # Invalidate session
+        invalidate_session(session_id, user_id)
+        
+        # Create response and clear cookies
+        response = make_response(jsonify({
+            "success": True,
+            "message": "Logged out successfully"
+        }))
+        
+        response = clear_auth_cookies(response)
+        
+        return response, 200
+        
+    except Exception as e:
+        print(f"Logout error: {e}")
+        return jsonify({
+            "success": False,
+            "message": "An error occurred during logout"
+        }), 500
 
-    if not code:
-        return jsonify({"success": False, "message": "Please enter your verification code."}), 400
 
-    valid, message = verify_2fa_code(code)
-    if valid:
-        username = session.pop('pending_user', None)
-        session['user'] = username
-        return jsonify({"success": True, "message": f"Welcome, {username}! You are now logged in."})
-    else:
-        return jsonify({"success": False, "message": message}), 400
+@app.route('/api/refresh', methods=['POST'])
+def api_refresh():
+    """
+    Refresh access token using refresh token.
+    """
+    refresh_token = request.cookies.get('refresh_token')
+    
+    if not refresh_token:
+        return jsonify({
+            "success": False,
+            "message": "Refresh token not found",
+            "error": "NO_REFRESH_TOKEN"
+        }), 401
+    
+    access_token, _, error = refresh_access_token(refresh_token)
+    
+    if not access_token:
+        response = make_response(jsonify({
+            "success": False,
+            "message": error or "Failed to refresh token",
+            "error": "REFRESH_FAILED"
+        }))
+        response = clear_auth_cookies(response)
+        return response, 401
+    
+    # Create response with new access token
+    response = make_response(jsonify({
+        "success": True,
+        "message": "Token refreshed successfully"
+    }))
+    
+    # Set new access token cookie (keep refresh token)
+    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
+    response.set_cookie(
+        'access_token',
+        access_token,
+        httponly=True,
+        secure=is_production,
+        samesite='Lax',
+        max_age=3600,
+        path='/'
+    )
+    
+    return response, 200
+
+
+@app.route('/api/csrf-token', methods=['GET'])
+def api_csrf_token():
+    """
+    Get CSRF token for forms.
+    """
+    token = generate_csrf_token()
+    return jsonify({
+        "success": True,
+        "csrf_token": token
+    }), 200
+
+
+@app.route('/api/verify-session', methods=['GET'])
+@require_auth
+def api_verify_session():
+    """
+    Verify if current session is valid.
+    Returns user information.
+    """
+    return jsonify({
+        "success": True,
+        "user": {
+            "id": request.user_id,
+            "username": request.username
+        }
+    }), 200
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -220,11 +342,11 @@ def register():
             return render_template('register.html')
 
         try:
-            cursor = connection.cursor()
+            db_query = create_query_executor(connection)
 
             # Check if username or email already exists
-            cursor.execute("SELECT * FROM user WHERE user_name=%s OR user_email=%s", (username, email))
-            existing_user = cursor.fetchone()
+            db_query.execute("SELECT * FROM user WHERE user_name=%s OR user_email=%s", (username, email))
+            existing_user = db_query.fetchone()
 
             if existing_user:
                 flash("Username or email already exists!", "danger")
@@ -232,7 +354,7 @@ def register():
 
             # Insert new user into database
             insert_query = "INSERT INTO user (user_name, user_email, password_hash) VALUES (%s, %s, %s)"
-            cursor.execute(insert_query, (username, email, password_hash))
+            db_query.execute(insert_query, (username, email, password_hash))
             connection.commit()
             flash("Account created successfully!", "success")
         
@@ -240,11 +362,11 @@ def register():
             print(f"Database error: {e}")
             flash("An error occurred while creating the account.", "danger")
             return render_template('register.html')
-
+        
         finally:
-            # Always close cursor and connection
-            if cursor:
-                cursor.close()
+            # Always close db_query and connection
+            if db_query:
+                db_query.close()
             if connection:
                 connection.close()
 
@@ -254,7 +376,12 @@ def register():
     return render_template('register.html')
 
 @app.route('/api/register', methods=['POST'])
+@require_csrf
 def api_register():
+    """
+    Register endpoint with automatic login after registration.
+    Creates user account and session tokens.
+    """
     data = request.get_json()
 
     # Extract data from JSON
@@ -267,59 +394,121 @@ def api_register():
 
     # Check for missing fields
     if not all([username, email, password, confirm_password]):
-        return jsonify({"message": "All required fields must be filled."}), 400
+        return jsonify({
+            "success": False,
+            "message": "All required fields must be filled."
+        }), 400
 
     # Check if passwords match
     if password != confirm_password:
-        return jsonify({"message": "Passwords do not match!"}), 400
+        return jsonify({
+            "success": False,
+            "message": "Passwords do not match!"
+        }), 400
 
     # Validate username and email format
     USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
     if not USERNAME_RE.match(username):
-        return jsonify({"message": "Invalid username format."}), 400
+        return jsonify({
+            "success": False,
+            "message": "Invalid username format."
+        }), 400
 
     if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
-        return jsonify({"message": "Invalid email format."}), 400
+        return jsonify({
+            "success": False,
+            "message": "Invalid email format."
+        }), 400
 
     # Length checks
     if len(username) > 50 or len(email) > 100 or len(password) > 100:
-        return jsonify({"message": "Input too long."}), 400
+        return jsonify({
+            "success": False,
+            "message": "Input too long."
+        }), 400
 
     password_hash = hash_password(password)
-    private_value = 1 if private else 0  # ✅ convert bool → tinyint(1)
+    private_value = 1 if private else 0
 
     # Connect to DB
     connection = get_db_connection()
     if connection is None:
-        return jsonify({"message": "Database connection failed."}), 500
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
 
     try:
-        cursor = connection.cursor(dictionary=True)
+        db_query = connection.cursor(dictionary=True)
 
         # Check if username or email exists
-        cursor.execute(
+        db_query.execute(
             "SELECT * FROM user WHERE user_name=%s OR user_email=%s",
             (username, email),
         )
-        existing_user = cursor.fetchone()
+        existing_user = db_query.fetchone()
 
         if existing_user:
-            return jsonify({"message": "Username or email already exists!"}), 400
+            return jsonify({
+                "success": False,
+                "message": "Username or email already exists!"
+            }), 400
 
         # Insert new user
         insert_query = """
             INSERT INTO user (user_name, user_email, password_hash, bio, is_private)
             VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_query, (username, email, password_hash, bio, private_value))
+        db_query.execute(insert_query, (username, email, password_hash, bio, private_value))
         connection.commit()
+
+        # Get the newly created user
+        user_id = db_query.lastrowid
+        db_query.execute("SELECT * FROM user WHERE user_id=%s", (user_id,))
+        new_user = db_query.fetchone()
+
+        db_query.close()
+        connection.close()
+
+        # Automatically log in the user after registration
+        ip_address = request.remote_addr or '0.0.0.0'
+        user_agent = request.headers.get('User-Agent', '')
+        
+        access_token, refresh_token, session_id = create_session(
+            new_user['user_id'],
+            new_user['user_name'],
+            ip_address,
+            user_agent
+        )
+
+        if not access_token:
+            return jsonify({
+                "success": False,
+                "message": "Account created but failed to create session. Please login."
+            }), 500
+
+        # Create response with tokens in cookies
+        response = make_response(jsonify({
+            "success": True,
+            "message": "Account created successfully!",
+            "user": {
+                "id": new_user['user_id'],
+                "username": new_user['user_name'],
+                "email": new_user.get('user_email', '')
+            }
+        }))
+
+        # Set secure cookies
+        response = set_auth_cookies(response, access_token, refresh_token)
+
+        return response, 201
 
     except Exception as e:
         print(f"Database error: {e}")
-        return jsonify({"message": "An error occurred during registration."}), 500
-
-    finally:
-        cursor.close()
-        connection.close()
-
-    return jsonify({"message": "Account created successfully!"}), 201
+        if connection:
+            connection.rollback()
+            connection.close()
+        return jsonify({
+            "success": False,
+            "message": "An error occurred during registration."
+        }), 500

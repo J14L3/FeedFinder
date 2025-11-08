@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, UserPlus, User, Mail, Lock, FileText, Eye, EyeOff } from 'lucide-react';
-import { API_BASE } from './config';
+import { register } from './authService';
 
 const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
   const [form, setForm] = useState({
@@ -18,6 +18,13 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  useEffect(() => {
+    // Fetch CSRF token on component mount
+    import('./authService').then(({ fetchCSRFToken }) => {
+      fetchCSRFToken();
+    });
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -32,14 +39,9 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
+      const { success, data } = await register(form);
 
-      if (res.ok) {
+      if (success) {
         setMessage(data.message || "Account created successfully!");
         setIsError(false);
         setForm({
@@ -50,11 +52,12 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
           bio: "",
           private: false,
         });
-        // Switch to login page after a short delay
+        // Automatically log in after registration
         setTimeout(() => {
-          setShowLoginModal(true);
+          setIsLoggedIn(true);
+          setShowLoginModal(false);
           setMessage("");
-        }, 1500);
+        }, 1000);
       } else {
         setMessage(data.message || "Error creating account. Please try again.");
         setIsError(true);
