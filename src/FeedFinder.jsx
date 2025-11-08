@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogIn, LogOut, Settings } from 'lucide-react';
+import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings } from 'lucide-react';
 import CreatePostModal from './CreatePostModal';
 import DonateModal from './DonateModal';
 import RatingModal from './RatingModal';
+import LoginPage from './LoginModal';
+import RegisterPage from './RegisterModal';
 import PostCards from './PostCards';
 import UploadMedia from './UploadMedia';
 import SettingsPage from './SettingsPage';
@@ -24,6 +26,7 @@ const FeedFinder = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDonateModal, setShowDonateModal] = useState(null);
   const [showRatingModal, setShowRatingModal] = useState(null);
+  const [showRegisterPage, setShowRegisterPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -147,6 +150,24 @@ const FeedFinder = () => {
     post.caption.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Show login/register page if not logged in
+  if (!isLoggedIn) {
+    if (showRegisterPage) {
+      return (
+        <RegisterPage 
+          setShowLoginModal={() => setShowRegisterPage(false)}
+          setIsLoggedIn={setIsLoggedIn}
+        />
+      );
+    }
+    return (
+      <LoginPage 
+        setShowRegisterModal={() => setShowRegisterPage(true)}
+        setIsLoggedIn={setIsLoggedIn}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -192,85 +213,73 @@ const FeedFinder = () => {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-2">
-              {isLoggedIn ? (
-                <>
-                  <button className="p-2 hover:bg-gray-100 rounded-full relative">
-                    <Bell size={22} className="text-gray-700" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                  </button>
-                  <div className="relative" ref={userMenuRef}>
-                    <button
-                      onClick={() => setShowUserMenu(!showUserMenu)}
-                      className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-all border-2 border-gray-200 hover:border-blue-500 shadow-sm hover:shadow-md"
-                    >
-                      <img
-                        src="https://api.dicebear.com/7.x/avataaars/svg?seed=User"
-                        alt="User"
-                        className="w-9 h-9 rounded-full ring-2 ring-white"
-                      />
-                      {isPremium && (
-                        <Crown size={18} className="text-yellow-500" />
-                      )}
-                    </button>
-                    {showUserMenu && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[100] animate-slideUp">
-                        <button 
-                          onClick={() => {
-                            setActiveTab('upload');
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
-                        >
-                          <PlusSquare size={18} />
-                          Create
-                        </button>
-                        <button className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900">
-                          <User size={18} />
-                          Profile
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setActiveTab('settings');
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
-                        >
-                          <Settings size={18} />
-                          Settings
-                        </button>
-                        {!isPremium && (
-                          <button 
-                            onClick={() => {
-                              setActiveTab('premium');
-                              setShowUserMenu(false);
-                            }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-yellow-600"
-                          >
-                            <Crown size={18} />
-                            Upgrade to Premium
-                          </button>
-                        )}
-                        <hr className="my-2" />
-                        <button
-                          onClick={() => setIsLoggedIn(false)}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
-                        >
-                          <LogOut size={18} />
-                          Logout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
+              <button className="p-2 hover:bg-gray-100 rounded-full relative">
+                <Bell size={22} className="text-gray-700" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+              <div className="relative" ref={userMenuRef}>
                 <button
-                  onClick={() => setIsLoggedIn(true)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-full font-medium hover:bg-blue-600 transition flex items-center gap-2"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-all border-2 border-gray-200 hover:border-blue-500 shadow-sm hover:shadow-md"
                 >
-                  <LogIn size={18} />
-                  <span className="hidden sm:inline">Login</span>
+                  <img
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=User"
+                    alt="User"
+                    className="w-9 h-9 rounded-full ring-2 ring-white"
+                  />
+                  {isPremium && (
+                    <Crown size={18} className="text-yellow-500" />
+                  )}
                 </button>
-              )}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[100] animate-slideUp">
+                    <button 
+                      onClick={() => {
+                        setActiveTab('upload');
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
+                    >
+                      <PlusSquare size={18} />
+                      Create
+                    </button>
+                    <button className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900">
+                      <User size={18} />
+                      Profile
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setActiveTab('settings');
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
+                    >
+                      <Settings size={18} />
+                      Settings
+                    </button>
+                    {!isPremium && (
+                      <button 
+                        onClick={() => {
+                          setActiveTab('premium');
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-yellow-600"
+                      >
+                        <Crown size={18} />
+                        Upgrade to Premium
+                      </button>
+                    )}
+                    <hr className="my-2" />
+                    <button
+                      onClick={() => setIsLoggedIn(false)}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                    >
+                      <LogOut size={18} />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
