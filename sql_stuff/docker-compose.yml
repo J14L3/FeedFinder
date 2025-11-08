@@ -1,0 +1,19 @@
+services:
+  mysql:
+    image: mysql:8.0-debian
+    container_name: mysql-compose-container
+    environment:
+      MYSQL_ROOT_PASSWORD: "P@ssw0rdSSD69"
+      # MYSQL_DATABASE: feedfinder
+      MYSQL_USER: "ssduser"
+      MYSQL_PASSWORD: "P@ssw0rdSSD67"
+    command: [
+      "--authentication-policy=mysql_native_password"
+    ]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data: 
