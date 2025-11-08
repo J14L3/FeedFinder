@@ -7,15 +7,16 @@ from dotenv import load_dotenv
 import os
 from itsdangerous import URLSafeTimedSerializer
 
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback-secret-key')
 
 # Load .env file from specific path
-dotenv_path = '/home/ubuntu/email.env'
+dotenv_path = '/home/student3/email.env'
 load_dotenv(dotenv_path)
 
 # Update Flask config from environment variables
 app.config.update(
     MAIL_SERVER=os.getenv('MAIL_SERVER'),
-    MAIL_PORT=int(os.getenv('MAIL_PORT')),
+    MAIL_PORT=int(os.getenv('MAIL_PORT') or '587'),
     MAIL_USE_TLS=os.getenv('MAIL_USE_TLS') == 'True',
     MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
     MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),

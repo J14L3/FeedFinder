@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 
 # Load .env file from a specific path
-load_dotenv("/home/ubuntu/db.env")
+load_dotenv("/home/student3/email.env")
 
 def get_db_connection():
     try:
@@ -19,5 +19,3 @@ def get_db_connection():
     except Error as e:
         print(f"Error: {e}")
         return None
-
-9
