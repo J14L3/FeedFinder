@@ -7,9 +7,7 @@ from dotenv import load_dotenv
 import os
 from itsdangerous import URLSafeTimedSerializer
 
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback-secret-key')
-
-# Load .env file from specific path
+# Load .env file from specific path FIRST
 dotenv_path = '/home/student3/email.env'
 load_dotenv(dotenv_path)
 
@@ -20,7 +18,7 @@ app.config.update(
     MAIL_USE_TLS=os.getenv('MAIL_USE_TLS') == 'True',
     MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
     MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
-    SECRET_KEY=os.getenv('SECRET_KEY'),
+    SECRET_KEY=os.getenv('SECRET_KEY') or os.environ.get('SECRET_KEY') or 'AlphaThreeForty',
     BASE_URL=os.getenv('BASE_URL')
 )
 
