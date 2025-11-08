@@ -3,11 +3,19 @@ from flask_cors import CORS
 app = Flask(__name__)
 
 # Configure CORS to allow credentials (cookies) for session management
+# When using supports_credentials=True, we need to explicitly allow origins
+# Using resource specific CORS for better control
 CORS(app, 
-     supports_credentials=True, 
-     origins=['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-     allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'],
-     expose_headers=['X-CSRF-Token'])
+     resources={
+         r"/api/*": {
+             "origins": "*",  # Allow all origins for API endpoints
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token", "X-Requested-With"],
+             "expose_headers": ["X-CSRF-Token"],
+             "supports_credentials": True,
+             "max_age": 3600
+         }
+     })
 from flask_mail import Mail
 from dotenv import load_dotenv
 import os

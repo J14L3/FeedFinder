@@ -152,6 +152,14 @@ def create_session(user_id, username, ip_address, user_agent):
         return None, None, None
     
     try:
+        # Create sessions table if it doesn't exist (do this first)
+        create_sessions_table_if_not_exists()
+        
+        # Get a fresh connection for the insert
+        connection = get_db_connection()
+        if not connection:
+            return None, None, None
+        
         db_query = create_query_executor(connection, dictionary=True)
         
         # Generate tokens
@@ -191,9 +199,14 @@ def create_session(user_id, username, ip_address, user_agent):
         
     except Exception as e:
         print(f"Error creating session: {e}")
+        import traceback
+        traceback.print_exc()
         if connection:
-            connection.rollback()
-            connection.close()
+            try:
+                connection.rollback()
+                connection.close()
+            except:
+                pass
         return None, None, None
 
 
@@ -201,6 +214,9 @@ def invalidate_session(session_id, user_id=None):
     """
     Invalidate a session by setting is_active to 0.
     """
+    # Ensure sessions table exists
+    create_sessions_table_if_not_exists()
+    
     connection = get_db_connection()
     if not connection:
         return False
@@ -225,9 +241,14 @@ def invalidate_session(session_id, user_id=None):
         
     except Exception as e:
         print(f"Error invalidating session: {e}")
+        import traceback
+        traceback.print_exc()
         if connection:
-            connection.rollback()
-            connection.close()
+            try:
+                connection.rollback()
+                connection.close()
+            except:
+                pass
         return False
 
 
@@ -302,6 +323,53 @@ def refresh_access_token(refresh_token):
             connection.close()
         return None, None, str(e)
 
+
+
+def create_sessions_table_if_not_exists():
+    """
+    Create the sessions table if it doesn't exist.
+    """
+    connection = get_db_connection()
+    if not connection:
+        return False
+    
+    try:
+        db_query = create_query_executor(connection)
+        
+        create_table_query = """
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id VARCHAR(255) PRIMARY KEY,
+                user_id INT NOT NULL,
+                username VARCHAR(50) NOT NULL,
+                ip_address VARCHAR(45) NOT NULL,
+                user_agent TEXT,
+                fingerprint VARCHAR(64),
+                created_at DATETIME NOT NULL,
+                expires_at DATETIME NOT NULL,
+                last_accessed DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                is_active TINYINT(1) DEFAULT 1,
+                INDEX idx_user_id (user_id),
+                INDEX idx_session_id (session_id),
+                INDEX idx_expires_at (expires_at),
+                FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """
+        
+        db_query.execute(create_table_query)
+        connection.commit()
+        db_query.close()
+        connection.close()
+        return True
+        
+    except Exception as e:
+        print(f"Note creating sessions table: {e}")
+        if connection:
+            try:
+                connection.rollback()
+                connection.close()
+            except:
+                pass
+        return False
 
 
 def cleanup_expired_sessions():

@@ -2,7 +2,7 @@ from app import app
 from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response
 from app.hash import hash_password, verify_password
 from app.db import get_db_connection, create_query_executor
-from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, cleanup_expired_sessions
+from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, verify_session_token, cleanup_expired_sessions
 from app.auth_middleware import require_auth, optional_auth, set_auth_cookies, clear_auth_cookies, get_token_from_request
 from app.csrf import generate_csrf_token, require_csrf
 import re
@@ -15,6 +15,14 @@ from app.two_factor import initiate_2fa, verify_2fa_code
 @app.route('/index')
 def index():
     return "Hello, World!"
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """Health check endpoint to verify API is accessible"""
+    return jsonify({
+        "status": "ok",
+        "message": "API is running"
+    }), 200
 
 # The new route for the page
 @app.route('/login', methods=['GET', 'POST'])
@@ -90,13 +98,15 @@ def login():
     # Render the template and pass the result (if any)
     return render_template('login.html', result=result)
 
-@app.route('/api/login', methods=['POST'])
-@require_csrf
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def api_login():
     """
     Login endpoint with session token creation.
     Creates secure session tokens and sets them in HttpOnly cookies.
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -123,7 +133,7 @@ def api_login():
         }), 500
 
     try:
-        db_query = connection.cursor(dictionary=True)
+        db_query = create_query_executor(connection, dictionary=True)
         db_query.execute("SELECT * FROM user WHERE user_name=%s", (username,))
         user = db_query.fetchone()
         db_query.close()
@@ -136,7 +146,7 @@ def api_login():
             }), 401
 
         # Get client info for session security
-        ip_address = request.remote_addr or '0.0.0.0'
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
         user_agent = request.headers.get('User-Agent', '')
         
         # Create session and generate tokens
@@ -199,16 +209,35 @@ def verify_2fa():
     return render_template('verify_2fa.html')
 
 
-@app.route('/api/logout', methods=['POST'])
-@require_auth
+@app.route('/api/logout', methods=['POST', 'OPTIONS'])
 def api_logout():
     """
     Logout endpoint that invalidates the current session.
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check authentication
+    token = get_token_from_request()
+    if not token:
+        return jsonify({
+            'success': False,
+            'message': 'Authentication required',
+            'error': 'NO_TOKEN'
+        }), 401
+    
+    is_valid, payload, error = verify_session_token(token)
+    if not is_valid:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid or expired session',
+            'error': error or 'INVALID_TOKEN'
+        }), 401
+    
+    session_id = payload.get('session_id')
+    user_id = payload.get('user_id')
+    
     try:
-        session_id = request.session_id
-        user_id = request.user_id
-        
         # Invalidate session
         invalidate_session(session_id, user_id)
         
@@ -276,30 +305,57 @@ def api_refresh():
     return response, 200
 
 
-@app.route('/api/csrf-token', methods=['GET'])
+@app.route('/api/csrf-token', methods=['GET', 'OPTIONS'])
 def api_csrf_token():
     """
     Get CSRF token for forms.
+    This endpoint does not require authentication.
     """
-    token = generate_csrf_token()
-    return jsonify({
-        "success": True,
-        "csrf_token": token
-    }), 200
+    try:
+        token = generate_csrf_token()
+        return jsonify({
+            "success": True,
+            "csrf_token": token
+        }), 200
+    except Exception as e:
+        print(f"Error generating CSRF token: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Failed to generate CSRF token"
+        }), 500
 
 
-@app.route('/api/verify-session', methods=['GET'])
-@require_auth
+@app.route('/api/verify-session', methods=['GET', 'OPTIONS'])
 def api_verify_session():
     """
     Verify if current session is valid.
     Returns user information.
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    # Check authentication
+    token = get_token_from_request()
+    if not token:
+        return jsonify({
+            'success': False,
+            'message': 'Authentication required',
+            'error': 'NO_TOKEN'
+        }), 401
+    
+    is_valid, payload, error = verify_session_token(token)
+    if not is_valid:
+        return jsonify({
+            'success': False,
+            'message': 'Invalid or expired session',
+            'error': error or 'INVALID_TOKEN'
+        }), 401
+    
     return jsonify({
         "success": True,
         "user": {
-            "id": request.user_id,
-            "username": request.username
+            "id": payload.get('user_id'),
+            "username": payload.get('username')
         }
     }), 200
 
@@ -375,13 +431,15 @@ def register():
 
     return render_template('register.html')
 
-@app.route('/api/register', methods=['POST'])
-@require_csrf
+@app.route('/api/register', methods=['POST', 'OPTIONS'])
 def api_register():
     """
     Register endpoint with automatic login after registration.
     Creates user account and session tokens.
     """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     data = request.get_json()
 
     # Extract data from JSON
@@ -439,7 +497,7 @@ def api_register():
         }), 500
 
     try:
-        db_query = connection.cursor(dictionary=True)
+        db_query = create_query_executor(connection, dictionary=True)
 
         # Check if username or email exists
         db_query.execute(
@@ -471,7 +529,7 @@ def api_register():
         connection.close()
 
         # Automatically log in the user after registration
-        ip_address = request.remote_addr or '0.0.0.0'
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
         user_agent = request.headers.get('User-Agent', '')
         
         access_token, refresh_token, session_id = create_session(
