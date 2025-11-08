@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login</title>
+</head>
+<body>
+    <h1>Login</h1>
+    {% set messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% set category, message = messages[-1] %}  {# take only the last message #}
+        <div class="alert {% if category == 'danger' %}alert-danger{% else %}alert-success{% endif %}">
+            {{ message }}
+        </div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+        <label for="username_input">Username:</label><br>
+        <input type="text" id="username_input" name="username_input" required><br><br>
+
+        <label for="password_input">Password:</label><br>
+        <input type="text" id="password_input" name="password_input" required><br><br>
+
+        <button type="submit">Submit Data</button>
+    </form>
+
+    {% if result %}
+    <hr>
+    <h2>Submission Result:</h2>
+
+
+    
+    <p>**{{ result }}**</p>
+    {% endif %}
+
+</body>
+</html>
