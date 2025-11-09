@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings } from 'lucide-react';
+import { API_BASE } from './config'; // test
 import CreatePostModal from './CreatePostModal';
 import DonateModal from './DonateModal';
 import RatingModal from './RatingModal';
