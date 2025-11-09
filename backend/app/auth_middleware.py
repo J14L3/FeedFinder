@@ -54,7 +54,7 @@ def require_auth(f):
         # Add user info to request context
         request.user_id = payload.get('user_id')
         request.username = payload.get('username')
-        request.user_role = payload.get('user_role', 'admin')
+        request.user_role = payload.get('user_role')
         request.session_id = payload.get('session_id')
         
         return f(*args, **kwargs)
@@ -76,7 +76,7 @@ def optional_auth(f):
             if is_valid:
                 request.user_id = payload.get('user_id')
                 request.username = payload.get('username')
-                request.user_role = payload.get('user_role', 'normie')
+                request.user_role = payload.get('user_role')
                 request.session_id = payload.get('session_id')
             else:
                 # Token invalid but route allows unauthenticated access

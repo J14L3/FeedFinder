@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings, Mail, User, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { fetchCurrentUserProfile, updateProfile } from './profileService';
+import { verifySession } from './authService';
 
 const SettingsPage = () => {
-  const [email, setEmail] = useState('user@example.com');
+  const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState('https://api.dicebear.com/7.x/avataaars/svg?seed=User');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // 'success' or 'error'
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Predefined profile picture options
   const profilePictureOptions = [
@@ -24,6 +28,38 @@ const SettingsPage = () => {
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Chris'
   ];
 
+  // Fetch current user profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        const profile = await fetchCurrentUserProfile();
+        
+        if (profile) {
+          setEmail(profile.user_email || '');
+          setBio(profile.bio || '');
+          setProfilePicture(profile.profile_picture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=User');
+        } else {
+          // Check if user is authenticated
+          const user = await verifySession();
+          if (!user) {
+            setErrorMessage('Please log in to view your settings');
+          } else {
+            setErrorMessage('Failed to load profile data');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setErrorMessage('Failed to load profile data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -32,29 +68,81 @@ const SettingsPage = () => {
   const handleSave = async () => {
     // Validate email
     if (!email.trim()) {
-      alert('Email is required.');
+      setSaveStatus('error');
+      setErrorMessage('Email is required.');
       return;
     }
 
     if (!validateEmail(email)) {
-      alert('Please enter a valid email address.');
+      setSaveStatus('error');
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
 
     setIsSaving(true);
     setSaveStatus(null);
+    setErrorMessage('');
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Prepare update data (only send fields that have changed)
+      const updateData = {
+        user_email: email.trim(),
+        bio: bio.trim(),
+        profile_picture: profilePicture
+      };
+
+      const result = await updateProfile(updateData);
+
+      if (result.success) {
+        setSaveStatus('success');
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSaveStatus(null);
+        }, 3000);
+      } else {
+        setSaveStatus('error');
+        setErrorMessage(result.error || 'Failed to save settings. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setSaveStatus('error');
+      setErrorMessage('An error occurred while saving settings. Please try again.');
+    } finally {
       setIsSaving(false);
-      setSaveStatus('success');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSaveStatus(null);
-      }, 3000);
-    }, 1500);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="w-full">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="ml-3 text-gray-600">Loading settings...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMessage && !email) {
+    return (
+      <div className="w-full">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <Settings size={32} className="text-blue-600" />
+              <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+            </div>
+          </div>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
+            <p className="text-sm text-red-800">{errorMessage}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -177,7 +265,7 @@ const SettingsPage = () => {
         {saveStatus === 'error' && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
             <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
-            <p className="text-sm text-red-800">Failed to save settings. Please try again.</p>
+            <p className="text-sm text-red-800">{errorMessage || 'Failed to save settings. Please try again.'}</p>
           </div>
         )}
 
