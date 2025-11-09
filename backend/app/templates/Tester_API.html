@@ -26,31 +26,6 @@
   <h1>FeedFinder API Tester</h1>
   <p class="small">This page talks to your <code>api.py</code> JSON endpoints under <code>/api</code>. It uses <b>fetch()</b> and shows responses below each form.</p>
 
-  <div class="grid">
-    <!-- Register -->
-    <div class="card">
-      <h2>Register</h2>
-      <form id="f-register">
-        <label>Name <input name="user_name" required></label>
-        <label>Email <input name="user_email" type="email" required></label>
-        <label>Password <input name="password" type="password" required></label>
-        <button>Register</button>
-      </form>
-      <pre id="out-register"></pre>
-    </div>
-
-    <!-- Login -->
-    <div class="card">
-      <h2>Login</h2>
-      <form id="f-login">
-        <label>Email <input name="user_email" type="email" required></label>
-        <label>Password <input name="password" type="password" required></label>
-        <button>Login</button>
-      </form>
-      <div class="small">Stores <code>user_id</code> in the tester state if successful.</div>
-      <pre id="out-login"></pre>
-    </div>
-
     <!-- Profile: get -->
     <div class="card">
       <h2>Get Profile</h2>
