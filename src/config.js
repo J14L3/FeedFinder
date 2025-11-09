@@ -4,7 +4,7 @@
 
 // For production - use relative URL so nginx handles SSL termination
 // This works if nginx proxies /api/* to your backend
-export const API_BASE = "https://3.150.122.114";
+export const API_BASE = "https://3.150.122.114:5000";
 
 // Alternative: If you need absolute URL, use your domain with HTTPS
 // export const API_BASE = "https://your-domain.com";

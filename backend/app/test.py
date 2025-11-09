@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory # send_from_directory is for test
 from app.hash import hash_password, verify_password
 from app.db import get_db_connection
 from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, verify_session_token, cleanup_expired_sessions
@@ -10,6 +10,8 @@ import os
 from itsdangerous import URLSafeTimedSerializer
 from app.two_factor import initiate_2fa, verify_2fa_code
 from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename # test
+import uuid # test
 
 
 @app.route('/')
@@ -734,6 +736,64 @@ def create_post():
     connection.commit(); db_query.close(); connection.close()
     return jsonify({"message": "Post created successfully."})
 
+# media upload directory
+UPLOAD_FOLDER = "/var/www/feedfinder/uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "mp4", "mov", "webm"}
+MAX_FILE_SIZE_MB = 20
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# --- upload media ---
+@app.route("/api/upload", methods=["POST"])
+def upload_media():
+    if "file" not in request.files:
+        return jsonify({"success": False, "message": "No file part in request"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"success": False, "message": "No file selected"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({
+            "success": False,
+            "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        }), 400
+
+    # Limit file size (optional)
+    file.seek(0, os.SEEK_END)
+    size_mb = file.tell() / (1024 * 1024)
+    file.seek(0)
+    if size_mb > MAX_FILE_SIZE_MB:
+        return jsonify({"success": False, "message": "File too large"}), 400
+
+    # Secure filename
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    unique_name = f"{uuid.uuid4().hex}.{ext}"
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    try:
+        file.save(save_path)
+        media_url = f"/uploads/{unique_name}"  # relative URL for frontend
+        return jsonify({
+            "success": True,
+            "message": "File uploaded successfully",
+            "media_url": media_url
+        }), 201
+    except Exception as e:
+        print("Upload error:", e)
+        return jsonify({"success": False, "message": "Failed to save file"}), 500
+
+# lets frontend load media directly from the path below
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+
 @app.route("/api/posts/<int:user_id>", methods=["GET"])
 def get_user_posts(user_id):
     # Connect to DB
@@ -848,7 +908,7 @@ def api_view_creator_posts(creator_id):
         return jsonify(db_query.fetchall())
     finally:
         db_query.close(); connection.close()
-
+        
 # --- get random public posts and display ---
 @app.route("/api/posts/public", methods=["GET"])
 def api_public_posts():
