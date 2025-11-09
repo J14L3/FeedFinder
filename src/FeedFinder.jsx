@@ -10,6 +10,7 @@ import PostCards from './PostCards';
 import UploadMedia from './UploadMedia';
 import SettingsPage from './SettingsPage';
 import PremiumUpgrade from './PremiumUpgrade';
+import ProfilePage from './ProfilePage';
 
 // Load all images in the folder dynamically (Vite)
 const imageUrls = import.meta.glob('./assets/images/*.{png,jpg,jpeg,gif,webp,avif}', {
@@ -37,7 +38,10 @@ const FeedFinder = () => {
   const [posts, setPosts] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [feedError, setFeedError] = useState("");
+  const [viewingProfile, setViewingProfile] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const userMenuRef = useRef(null);
+
 
   // Check authentication status on mount
   useEffect(() => {
@@ -47,6 +51,9 @@ const FeedFinder = () => {
         const user = await verifySession();
         if (user) {
           setIsLoggedIn(true);
+          if (user.id) {
+            setCurrentUserId(user.id);
+          }
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
@@ -88,25 +95,40 @@ const FeedFinder = () => {
             throw new Error(data?.message || 'Failed to load posts');
           }
 
-          // Map backend rows into PostCards format
-          const mapped = data.items.map(p => ({
-            id: p.post_id,
-            author: {
-              name: p.user_name || 'User',
-              username: p.user_email ? `@${p.user_email.split('@')[0]}` : '@user',
-              avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User',
-              rating: 0,
-              verified: false,
-              isPremium: false
-            },
-            type: p.media_url ? 'image' : 'text',
-            content: p.media_url || '',
-            caption: p.content_text || '',
-            timestamp: new Date(p.created_at).toLocaleString(),
-            // likes: 0,
-            // comments: 0,
-            isExclusive: false
-          }));
+           // Helper function to format timestamp
+           const formatTimestamp = (timestamp) => {
+             if (!timestamp) return 'Just now';
+             const date = new Date(timestamp);
+             const now = new Date();
+             const diffInSeconds = Math.floor((now - date) / 1000);
+             
+             if (diffInSeconds < 60) return 'Just now';
+             if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+             if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+             if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+           };
+
+           // Map backend rows into PostCards format
+           const mapped = data.items.map(p => ({
+             id: p.post_id,
+             author: {
+               user_id: p.user_id,
+               name: p.user_name || 'User',
+               username: p.user_email ? `@${p.user_email.split('@')[0]}` : `@${p.user_name || 'user'}`,
+               avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (p.user_name || 'User'),
+               rating: 0,
+               verified: false,
+               isPremium: false
+             },
+             type: p.media_url ? 'image' : 'text',
+             content: p.media_url || '',
+             caption: p.content_text || '',
+             timestamp: p.created_at ? formatTimestamp(p.created_at) : 'Just now',
+             likes: 0,
+             comments: 0,
+             isExclusive: p.privacy === 'exclusive'
+           }));
 
           setPosts(mapped);
         } catch (err) {
@@ -332,10 +354,19 @@ const FeedFinder = () => {
                       <PlusSquare size={18} />
                       Create
                     </button>
-                    <button className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900">
-                      <User size={18} />
-                      Profile
-                    </button>
+                     <button 
+                       onClick={() => {
+                         if (currentUserId) {
+                           setViewingProfile({ user_id: currentUserId });
+                         }
+                         setActiveTab('profile');
+                         setShowUserMenu(false);
+                       }}
+                       className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
+                     >
+                       <User size={18} />
+                       Profile
+                     </button>
                     <button
                       onClick={() => {
                         setActiveTab('settings');
@@ -419,12 +450,27 @@ const FeedFinder = () => {
             <Search size={48} className="mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600">Search functionality coming soon...</p>
           </div>
-        ) : activeTab === 'profile' ? (
-          <div className="text-center py-12">
-            <User size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">Profile page coming soon...</p>
-          </div>
-        ) : (
+          ) : activeTab === 'profile' ? (
+           viewingProfile?.user_id || currentUserId ? (
+             <ProfilePage
+               userId={viewingProfile?.user_id || currentUserId}
+               isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
+               isLoggedIn={isLoggedIn}
+               isPremium={isPremium}
+               setShowDonateModal={setShowDonateModal}
+               setShowRatingModal={setShowRatingModal}
+               onBack={() => {
+                 setViewingProfile(null);
+                 setActiveTab('home');
+               }}
+             />
+           ) : (
+             <div className="text-center py-12">
+               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+               <p className="text-gray-600">Loading profile...</p>
+             </div>
+           )
+          ) : (
           <>    
             {
               loadingFeed ? (
@@ -442,21 +488,27 @@ const FeedFinder = () => {
                   <p className="text-gray-600">No public posts available</p>
                 </div>
               ) : (
-                filteredPosts.map(post => (
-                  <PostCards
-                    key={post.id}
-                    post={post}
-                    setShowDonateModal={setShowDonateModal}
-                    setShowRatingModal={setShowRatingModal}
-                    isLoggedIn={isLoggedIn}
-                    isPremium={isPremium}
-                  />
-                ))
-              )
-            }
-          </>
-        )}
-      </main>
+                 filteredPosts.map(post => (
+                   <PostCards
+                     key={post.id}
+                     post={post}
+                     setShowDonateModal={setShowDonateModal}
+                     setShowRatingModal={setShowRatingModal}
+                     isLoggedIn={isLoggedIn}
+                     isPremium={isPremium}
+                     onAuthorClick={() => {
+                       if (post.author?.user_id) {
+                         setViewingProfile({ user_id: post.author.user_id });
+                         setActiveTab('profile');
+                       }
+                     }}
+                   />
+                 ))
+               )
+             }
+           </>
+          )}
+        </main>
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-300 shadow-2xl z-30">
@@ -492,7 +544,12 @@ const FeedFinder = () => {
             <span className="text-xs">Search</span>
           </button>
           <button
-            onClick={() => setActiveTab('profile')}
+            onClick={() => {
+              if (currentUserId) {
+                setViewingProfile({ user_id: currentUserId });
+              }
+              setActiveTab('profile');
+            }}
             className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-600'}`}
           >
             <User size={24} />

@@ -7,12 +7,15 @@ const isSafeImageUrl = (url) => {
   return /^(https?:\/\/|data:image\/(?:png|jpeg|jpg|gif|webp);|blob:|\/|\.\/)/i.test(url);
 };
 
-const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = false, isPremium = false }) => {
+const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition mb-8 border-2 border-gray-200">
       {/* Author Header */}
       <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div 
+          className={`flex items-center gap-3 ${onAuthorClick ? 'cursor-pointer hover:opacity-80 transition' : ''}`}
+          onClick={onAuthorClick}
+        >
           <div className="relative">
             <img
               src={post.author.avatar}
