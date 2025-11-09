@@ -45,3 +45,7 @@ app.config.update(
 mail = Mail(app)
 
 from app import routes
+
+@app.route("/__routes")
+def __routes():
+    return {"routes": [str(r) for r in app.url_map.iter_rules()]}
