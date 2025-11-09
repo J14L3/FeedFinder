@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image, Video, File, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { API_BASE } from './config'; 
 
 const UploadMedia = ({ currUserId }) => { // receive the current user ID from main page
   const [uploadedFile, setUploadedFile] = useState(null);
