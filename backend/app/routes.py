@@ -571,7 +571,7 @@ def api_register():
             "message": "An error occurred during registration."
         }), 500
 
-@app.route("/api-tester") # remove after testing
+@app.route("/api-tester", methods=['GET', 'POST']) # remove after testing
 def api_tester():
     return render_template("tester_api.html")
 
