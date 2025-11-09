@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FeedFinder API Tester</title>
+  <style>
+    :root { --gap: 14px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 18px; }
+    h1 { margin: 0 0 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--gap); }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .card h2 { font-size: 1.05rem; margin: 0 0 10px; }
+    label { display:block; font-size:.9rem; margin-top:8px }
+    input, textarea, select, button { width:100%; padding:8px; margin-top:4px; box-sizing:border-box; }
+    textarea { min-height: 70px; }
+    .row { display:flex; gap:8px; }
+    .row > * { flex:1; }
+    .small { font-size:.85rem; color:#666; }
+    pre { background:#f7f7f7; border:1px solid #eee; padding:10px; border-radius:8px; max-height:220px; overflow:auto; }
+    .ok { color: #066a2c; }
+    .err { color: #a40000; }
+  </style>
+</head>
+<body>
+  <h1>FeedFinder API Tester</h1>
+  <p class="small">This page talks to your <code>api.py</code> JSON endpoints under <code>/api</code>. It uses <b>fetch()</b> and shows responses below each form.</p>
+
+  <div class="grid">
+    <!-- Register -->
+    <div class="card">
+      <h2>Register</h2>
+      <form id="f-register">
+        <label>Name <input name="user_name" required></label>
+        <label>Email <input name="user_email" type="email" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <button>Register</button>
+      </form>
+      <pre id="out-register"></pre>
+    </div>
+
+    <!-- Login -->
+    <div class="card">
+      <h2>Login</h2>
+      <form id="f-login">
+        <label>Email <input name="user_email" type="email" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <button>Login</button>
+      </form>
+      <div class="small">Stores <code>user_id</code> in the tester state if successful.</div>
+      <pre id="out-login"></pre>
+    </div>
+
+    <!-- Profile: get -->
+    <div class="card">
+      <h2>Get Profile</h2>
+      <form id="f-profile-get">
+        <label>User ID <input name="user_id" type="number" required></label>
+        <button>Fetch</button>
+      </form>
+      <pre id="out-profile-get"></pre>
+    </div>
+
+    <!-- Profile: get by email -->
+    <div class="card">
+      <h2>Get Profile (by Email)</h2>
+      <form id="f-profile-get-email">
+        <label>Email <input name="email" type="email" required></label>
+        <button>Fetch</button>
+      </form>
+      <pre id="out-profile-get-email"></pre>
+    </div>
+
+    <!-- Profile: update -->
+    <div class="card">
+      <h2>Update Profile</h2>
+      <form id="f-profile-update">
+        <label>User ID <input name="user_id" type="number" required></label>
+        <label>Name <input name="user_name"></label>
+        <label>Bio <textarea name="bio"></textarea></label>
+        <label>Profile Picture URL <input name="profile_picture"></label>
+        <label>Private?
+          <select name="is_private">
+            <option value="false">false</option>
+            <option value="true">true</option>
+          </select>
+        </label>
+        <button>Save</button>
+      </form>
+      <pre id="out-profile-update"></pre>
+    </div>
+
+    <!-- Friends: list -->
+    <div class="card">
+      <h2>List Friends</h2>
+      <form id="f-friends-list">
+        <label>User ID <input name="user_id" type="number" required></label>
+        <button>List</button>
+      </form>
+      <pre id="out-friends-list"></pre>
+    </div>
+
+    <!-- Friends: add/remove -->
+    <div class="card">
+      <h2>Add / Remove Friend</h2>
+      <form id="f-friends-add">
+        <label>Your User ID <input name="user_id" type="number" required></label>
+        <label>Other User ID <input name="other_user_id" type="number" required></label>
+        <button>Add Friend</button>
+      </form>
+      <form id="f-friends-remove" style="margin-top:8px;">
+        <label>Your User ID <input name="user_id" type="number" required></label>
+        <label>Other User ID <input name="other_user_id" type="number" required></label>
+        <button>Remove Friend</button>
+      </form>
+      <pre id="out-friends-mut"></pre>
+    </div>
+
+    <!-- Posts: create -->
+    <div class="card">
+      <h2>Create Post</h2>
+      <form id="f-post-create">
+        <label>User ID <input name="user_id" type="number" required></label>
+        <label>Text <textarea name="content_text"></textarea></label>
+        <label>Media URL <input name="media_url"></label>
+        <label>Privacy
+          <select name="privacy">
+            <option>public</option>
+            <option>friends</option>
+            <option>exclusive</option>
+          </select>
+        </label>
+        <button>Create</button>
+      </form>
+      <pre id="out-post-create"></pre>
+    </div>
+
+    <!-- Posts: update/delete -->
+    <div class="card">
+      <h2>Update / Delete Post</h2>
+      <form id="f-post-update">
+        <label>Post ID <input name="post_id" type="number" required></label>
+        <label>Owner User ID <input name="user_id" type="number" required></label>
+        <label>Text <textarea name="content_text"></textarea></label>
+        <label>Media URL <input name="media_url"></label>
+        <label>Privacy
+          <select name="privacy">
+            <option>public</option>
+            <option>friends</option>
+            <option>exclusive</option>
+          </select>
+        </label>
+        <button>Update</button>
+      </form>
+      <form id="f-post-delete" style="margin-top:8px;">
+        <label>Post ID <input name="post_id" type="number" required></label>
+        <label>Owner User ID <input name="user_id" type="number" required></label>
+        <button>Delete</button>
+      </form>
+      <pre id="out-post-mut"></pre>
+    </div>
+
+    <!-- View creator posts with visibility rules -->
+    <div class="card">
+      <h2>View Creator Posts (Visibility)</h2>
+      <form id="f-posts-view">
+        <label>Creator ID <input name="creator_id" type="number" required></label>
+        <label>Viewer ID <input name="viewer_id" type="number" required></label>
+        <button>Fetch</button>
+      </form>
+      <pre id="out-posts-view"></pre>
+    </div>
+
+    <!-- Like -->
+    <div class="card">
+      <h2>Like</h2>
+      <form id="f-like">
+        <label>Post ID <input name="post_id" type="number" required></label>
+        <label>Your User ID <input name="user_id" type="number" required></label>
+        <button>Like</button>
+      </form>
+      <!-- <form id="f-comment" style="margin-top:8px;">
+        <label>Post ID <input name="post_id" type="number" required></label>
+        <label>Your User ID <input name="user_id" type="number" required></label>
+        <label>Comment <input name="comment_text" required></label>
+        <button>Comment</button>
+      </form>
+      <pre id="out-like-comment"></pre> -->
+    </div>
+
+    <!-- Subscribe / Membership -->
+    <div class="card">
+      <h2>Subscribe / Membership</h2>
+      <form id="f-subscribe">
+        <label>Subscriber ID <input name="subscriber_id" type="number" required></label>
+        <label>Creator ID <input name="creator_id" type="number" required></label>
+        <button>Subscribe 30 days</button>
+      </form>
+      <form id="f-membership" style="margin-top:8px;">
+        <label>User ID <input name="user_id" type="number" required></label>
+        <button>Activate Premium 30 days</button>
+      </form>
+      <pre id="out-sub-mem"></pre>
+    </div>
+
+    <!-- Rating -->
+    <div class="card">
+      <h2>Rate / View Rating</h2>
+      <form id="f-rate">
+        <label>Your User ID <input name="user_id" type="number" required></label>
+        <label>Target Email <input name="target_email" type="email" required></label>
+        <label>Rating (1–10) <input name="rating_value" type="number" min="1" max="10" required></label>
+        <button>Rate</button>
+      </form>
+      <form id="f-rate-view" style="margin-top:8px;">
+        <label>Target Email <input name="email" type="email" required></label>
+        <button>View Average</button>
+      </form>
+      <pre id="out-rate"></pre>
+    </div>
+  </div>
+
+  <script>
+    // Base API prefix (through Nginx proxy). Change to full URL if testing directly.
+    const API = '/api';
+
+    let testerState = { user_id: null };
+
+    function out(id, data, ok=true){
+      const el = document.getElementById(id);
+      el.innerHTML = (ok? '✅ ' : '❌ ') + new Date().toLocaleTimeString() + "\n" + JSON.stringify(data, null, 2);
+      el.className = ok ? 'ok' : 'err';
+    }
+
+    async function postJSON(path, body){
+      const r = await fetch(API + path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const j = await r.json().catch(()=>({raw: 'non-JSON response'}));
+      return { ok: r.ok, status: r.status, data: j };
+    }
+    async function putJSON(path, body){
+      const r = await fetch(API + path, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const j = await r.json().catch(()=>({raw: 'non-JSON response'}));
+      return { ok: r.ok, status: r.status, data: j };
+    }
+    async function delJSON(path, body){
+      const r = await fetch(API + path, { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const j = await r.json().catch(()=>({raw: 'non-JSON response'}));
+      return { ok: r.ok, status: r.status, data: j };
+    }
+    async function getJSON(path){
+      const r = await fetch(API + path);
+      const j = await r.json().catch(()=>({raw: 'non-JSON response'}));
+      return { ok: r.ok, status: r.status, data: j };
+    }
+
+    // Register
+    document.getElementById('f-register').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await postJSON('/register', body);
+      out('out-register', res, res.ok);
+    });
+
+    // Login
+    document.getElementById('f-login').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await postJSON('/login', body);
+      if(res.ok && res.data && res.data.user_id){ testerState.user_id = res.data.user_id; }
+      out('out-login', {...res, testerState}, res.ok);
+    });
+
+    // Profile get
+    document.getElementById('f-profile-get').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const id = new FormData(e.target).get('user_id');
+      const res = await getJSON(`/profile/${id}`);
+      out('out-profile-get', res, res.ok);
+    });
+
+    // Profile get with email
+    // Profile get by email (Option A: query param)
+    document.getElementById('f-profile-get-email')?.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = new FormData(e.target).get('email');
+      const res = await getJSON(`/profile/by-email?email=${encodeURIComponent(email)}`);
+      out('out-profile-get-email', res, res.ok);
+    });
+
+    // Profile update
+    document.getElementById('f-profile-update').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      body.is_private = body.is_private === 'true';
+      const res = await putJSON('/profile/update', body);
+      out('out-profile-update', res, res.ok);
+    });
+
+    // Friends list
+    document.getElementById('f-friends-list').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const id = new FormData(e.target).get('user_id');
+      const res = await getJSON(`/friends/${id}`);
+      out('out-friends-list', res, res.ok);
+    });
+
+    // Friends add
+    document.getElementById('f-friends-add').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await postJSON('/friends/add', body);
+      out('out-friends-mut', res, res.ok);
+    });
+    // Friends remove
+    document.getElementById('f-friends-remove').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await delJSON('/friends/remove', body);
+      out('out-friends-mut', res, res.ok);
+    });
+
+    // Post create
+    document.getElementById('f-post-create').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      const res = await postJSON('/posts', body);
+      out('out-post-create', res, res.ok);
+    });
+
+    // Post update
+    document.getElementById('f-post-update').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target); const obj = Object.fromEntries(fd.entries());
+      const postId = obj.post_id; delete obj.post_id;
+      const res = await putJSON(`/posts/${postId}`, obj);
+      out('out-post-mut', res, res.ok);
+    });
+
+    // Post delete
+    document.getElementById('f-post-delete').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target); const obj = Object.fromEntries(fd.entries());
+      const postId = obj.post_id; delete obj.post_id;
+      const res = await delJSON(`/posts/${postId}`, obj);
+      out('out-post-mut', res, res.ok);
+    });
+
+    // View creator posts with visibility
+    document.getElementById('f-posts-view').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const creator = fd.get('creator_id');
+      const viewer = fd.get('viewer_id');
+      const res = await getJSON(`/posts/user/${creator}?viewer=${viewer}`);
+      out('out-posts-view', res, res.ok);
+    });
+
+    // Like
+    document.getElementById('f-like').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target); const obj = Object.fromEntries(fd.entries());
+      const postId = obj.post_id; delete obj.post_id;
+      const res = await postJSON(`/posts/${postId}/like`, obj);
+      out('out-like-comment', res, res.ok);
+    });
+
+    // // Comment
+    // document.getElementById('f-comment').addEventListener('submit', async (e)=>{
+    //   e.preventDefault();
+    //   const fd = new FormData(e.target); const obj = Object.fromEntries(fd.entries());
+    //   const postId = obj.post_id; delete obj.post_id;
+    //   const res = await postJSON(`/posts/${postId}/comment`, obj);
+    //   out('out-like-comment', res, res.ok);
+    // });
+
+    // Subscribe
+    document.getElementById('f-subscribe').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      const res = await postJSON('/subscribe', body);
+      out('out-sub-mem', res, res.ok);
+    });
+
+    // Membership
+    document.getElementById('f-membership').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      const res = await postJSON('/membership', body);
+      out('out-sub-mem', res, res.ok);
+    });
+
+    // Rate
+    document.getElementById('f-rate').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      const res = await postJSON('/rate', body);
+      out('out-rate', res, res.ok);
+    });
+
+    // View rating
+    document.getElementById('f-rate-view').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = new FormData(e.target).get('email');
+      const res = await getJSON(`/rating/${encodeURIComponent(email)}`);
+      out('out-rate', res, res.ok);
+    });
+  </script>
+</body>
+</html>
