@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, LogIn, User, Lock } from 'lucide-react';
 import { login } from './authService';
-import { API_BASE } from "./config";
 
 const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [form, setForm] = useState({ username: "", password: "" });
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  const [requires2FA, setRequires2FA] = useState(false);
-  const [sessionToken, setSessionToken] = useState("");
-  const [twoFACode, setTwoFACode] = useState("");
 
   useEffect(() => {
     // Fetch CSRF token on component mount
@@ -28,12 +23,7 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
     try {
       const { success, data } = await login(form.username, form.password);
       
-      if (success && data.requires_2fa) {
-        setMessage("A 2FA code has been sent to your email.");
-        setIsError(false);
-        setRequires2FA(true);
-        setSessionToken(data.session_token);
-      } else if (success) {
+      if (success) {
         setMessage(data.message || "Login successful!");
         setIsError(false);
         // Set logged in after a short delay
@@ -48,36 +38,6 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
       }
     } catch (error) {
       setMessage("An error occurred. Please try again.");
-      setIsError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerify2FA = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setMessage("");
-    try {
-      const res = await fetch(`${API_BASE}/api/verify-2fa`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_token: sessionToken, code: twoFACode }),
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (data.success) {
-        setMessage("2FA verified successfully!");
-        setIsError(false);
-        setTimeout(() => {
-          setIsLoggedIn(true);
-        }, 800);
-      } else {
-        setMessage(data.message);
-        setIsError(true);
-      }
-    } catch (err) {
-      setMessage("Error verifying 2FA. Try again.");
       setIsError(true);
     } finally {
       setIsLoading(false);
@@ -162,44 +122,6 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
                 />
               </div>
             </div>
-
-            {requires2FA && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  2FA Code
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Enter 6-digit code"
-                    className="w-full pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-center tracking-widest font-mono text-lg"
-                    value={twoFACode}
-                    onChange={(e) => setTwoFACode(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    maxLength={6}
-                  />
-                </div>
-                <button
-                  onClick={handleVerify2FA}
-                  disabled={isLoading || twoFACode.length !== 6}
-                  className="w-full mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Verifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Lock size={18} />
-                      <span>Verify 2FA</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-
 
             {/* Submit Button */}
             <button
