@@ -330,7 +330,3 @@ def api_membership():
         return jsonify({"message": "Membership activated for 30 days."}), 201
     finally:
         cur.close(); con.close()
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
