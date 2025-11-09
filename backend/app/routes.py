@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory # send_from_directory is for test
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory
 from app.hash import hash_password, verify_password
 from app.db import get_db_connection
 from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, verify_session_token, cleanup_expired_sessions
@@ -9,8 +9,9 @@ import re, os
 from itsdangerous import URLSafeTimedSerializer
 from app.two_factor import initiate_2fa, verify_2fa_code
 from datetime import datetime, timedelta
-from werkzeug.utils import secure_filename # test
-import uuid # test
+from werkzeug.utils import secure_filename 
+import uuid
+import logging
 
 
 @app.route('/')
@@ -1049,48 +1050,48 @@ def api_delete_post(post_id):
         db_query.close(); connection.close()
 
 # --- Post Visibility (public / friends / exclusive) ---
-@app.route("/api/posts/user/<int:creator_id>", methods=["GET"])  # query: ?viewer=<viewer_id>
-def api_view_creator_posts(creator_id):
-    try:
-        viewer_id = int(request.args.get("viewer"))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Missing or invalid viewer id"}), 400
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
+# @app.route("/api/posts/user/<int:creator_id>", methods=["GET"])  # query: ?viewer=<viewer_id>
+# def api_view_creator_posts(creator_id):
+#     try:
+#         viewer_id = int(request.args.get("viewer"))
+#     except (TypeError, ValueError):
+#         return jsonify({"error": "Missing or invalid viewer id"}), 400
+#     # Connect to DB
+#     connection = get_db_connection()
+#     if connection is None:
+#         return jsonify({
+#             "success": False,
+#             "message": "Database connection failed."
+#         }), 500
     
-    db_query = connection.cursor(dictionary=True)
-    # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
-    # view other posts with logic implemented in sql query
-    # works with exclusive subcription and friends posts
-    try: 
-        db_query.execute(
-            """
-            SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at
-            FROM post p
-            WHERE p.user_id=%s
-              AND (
-                p.privacy='public'
-                OR (p.privacy='friends' AND EXISTS (
-                    SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
-                ))
-                OR (p.privacy='exclusive' AND EXISTS (
-                    SELECT 1 FROM subscription s
-                    WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
-                          AND NOW() BETWEEN s.start_date AND s.end_date
-                ))
-              )
-            ORDER BY p.created_at DESC
-            """,
-            (creator_id, viewer_id, creator_id, viewer_id, creator_id)
-        )
-        return jsonify(db_query.fetchall())
-    finally:
-        db_query.close(); connection.close()
+#     db_query = connection.cursor(dictionary=True)
+#     # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
+#     # view other posts with logic implemented in sql query
+#     # works with exclusive subcription and friends posts
+#     try: 
+#         db_query.execute(
+#             """
+#             SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at
+#             FROM post p
+#             WHERE p.user_id=%s
+#               AND (
+#                 p.privacy='public'
+#                 OR (p.privacy='friends' AND EXISTS (
+#                     SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
+#                 ))
+#                 OR (p.privacy='exclusive' AND EXISTS (
+#                     SELECT 1 FROM subscription s
+#                     WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
+#                           AND NOW() BETWEEN s.start_date AND s.end_date
+#                 ))
+#               )
+#             ORDER BY p.created_at DESC
+#             """,
+#             (creator_id, viewer_id, creator_id, viewer_id, creator_id)
+#         )
+#         return jsonify(db_query.fetchall())
+#     finally:
+#         db_query.close(); connection.close()
         
 # --- get random public posts and display ---
 @app.route("/api/posts/public", methods=["GET"])
@@ -1347,3 +1348,6 @@ def api_membership():
         return jsonify({"message": "Membership activated for 30 days."}), 201
     finally:
         db_query.close(); connection.close()
+
+print("UPLOAD_FOLDER path is:", app.config["UPLOAD_FOLDER"])
+

@@ -52,8 +52,8 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
       alert(`${file.name} is not a supported file type.`);
       return;
     }
-    if (file.size > 100 * 1024 * 1024) { // 100MB limit
-      alert(`${file.name} is too large. Maximum file size is 100MB.`);
+    if (file.size > 20 * 1024 * 1024) { // 20MB limit
+      alert(`${file.name} is too large. Maximum file size is 20MB.`);
       return;
     }
 
@@ -251,7 +251,7 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
           <p className="text-xs text-gray-400 mt-4">
             Supported: Images (JPEG, PNG, GIF, WebP) and Videos (MP4, WebM)
           </p>
-          <p className="text-xs text-gray-400">Maximum file size: 100MB per file</p>
+          <p className="text-xs text-gray-400">Maximum file size: 20MB per file</p>
         </div>
 
         {/* Uploaded File */}
