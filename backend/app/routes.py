@@ -5,8 +5,7 @@ from app.db import get_db_connection
 from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, verify_session_token, cleanup_expired_sessions
 from app.auth_middleware import require_auth, optional_auth, set_auth_cookies, clear_auth_cookies, get_token_from_request
 from app.csrf import generate_csrf_token, require_csrf
-import re
-import os
+import re, os
 from itsdangerous import URLSafeTimedSerializer
 from app.two_factor import initiate_2fa, verify_2fa_code
 from datetime import datetime, timedelta
@@ -148,28 +147,28 @@ def api_login():
                 "message": "Invalid username or password"
             }), 401
 
-        # âœ… Generate 2FA code
-        two_fa_code = str(random.randint(100000, 999999))
+        # # âœ… Generate 2FA code
+        # two_fa_code = str(random.randint(100000, 999999))
 
-        # Example: send by email
-        send_2fa_email(user['user_email'], two_fa_code)
+        # # Example: send by email
+        # send_2fa_email(user['user_email'], two_fa_code)
 
-        # âœ… Store temporary 2FA session info
-        session_token = secrets.token_urlsafe(32)
-        pending_2fa_sessions[session_token] = {
-            "username": username,
-            "user_id": user["user_id"],
-            "user_role": user["user_role"],
-            "code": two_fa_code,
-            "expires": datetime.utcnow() + timedelta(minutes=5)
-        }
+        # # âœ… Store temporary 2FA session info
+        # session_token = secrets.token_urlsafe(32)
+        # pending_2fa_sessions[session_token] = {
+        #     "username": username,
+        #     "user_id": user["user_id"],
+        #     "user_role": user["user_role"],
+        #     "code": two_fa_code,
+        #     "expires": datetime.utcnow() + timedelta(minutes=5)
+        # }
 
-        return jsonify({
-            "success": True,
-            "message": f"2FA code sent to {user['user_email']}.",
-            "requires_2fa": True,
-            "session_token": session_token  # returned to frontend to match later
-        }), 200
+        # return jsonify({
+        #     "success": True,
+        #     "message": f"2FA code sent to {user['user_email']}.",
+        #     "requires_2fa": True,
+        #     "session_token": session_token  # returned to frontend to match later
+        # }), 200
 
         # Get client info for session security
         ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
@@ -217,45 +216,45 @@ def api_login():
             "message": "An error occurred during login"
         }), 500
 
-@app.route('/api/verify-2fa', methods=['POST'])
-def verify_2fa():
-    data = request.get_json()
-    session_token = data.get('session_token')
-    code = data.get('code')
+# @app.route('/api/verify-2fa', methods=['POST'])
+# def verify_2fa():
+#     data = request.get_json()
+#     session_token = data.get('session_token')
+#     code = data.get('code')
 
-    info = pending_2fa_sessions.get(session_token)
-    if not info:
-        return jsonify({"success": False, "message": "Session expired or invalid"}), 400
+#     info = pending_2fa_sessions.get(session_token)
+#     if not info:
+#         return jsonify({"success": False, "message": "Session expired or invalid"}), 400
 
-    if datetime.utcnow() > info["expires"]:
-        del pending_2fa_sessions[session_token]
-        return jsonify({"success": False, "message": "2FA code expired"}), 400
+#     if datetime.utcnow() > info["expires"]:
+#         del pending_2fa_sessions[session_token]
+#         return jsonify({"success": False, "message": "2FA code expired"}), 400
 
-    if code != info["code"]:
-        return jsonify({"success": False, "message": "Incorrect 2FA code"}), 401
+#     if code != info["code"]:
+#         return jsonify({"success": False, "message": "Incorrect 2FA code"}), 401
 
-    # âœ… Create full session now
-    ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0')
-    user_agent = request.headers.get('User-Agent', '')
+#     # âœ… Create full session now
+#     ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0')
+#     user_agent = request.headers.get('User-Agent', '')
 
-    access_token, refresh_token, session_id = create_session(
-        info["user_id"], info["username"], info["user_role"], ip_address, user_agent
-    )
+#     access_token, refresh_token, session_id = create_session(
+#         info["user_id"], info["username"], info["user_role"], ip_address, user_agent
+#     )
 
-    del pending_2fa_sessions[session_token]
+#     del pending_2fa_sessions[session_token]
 
-    response = make_response(jsonify({
-        "success": True,
-        "message": f"Welcome {info['username']}!",
-        "user": {
-            "id": info["user_id"],
-            "username": info["username"],
-            "role": info["user_role"]
-        }
-    }))
+#     response = make_response(jsonify({
+#         "success": True,
+#         "message": f"Welcome {info['username']}!",
+#         "user": {
+#             "id": info["user_id"],
+#             "username": info["username"],
+#             "role": info["user_role"]
+#         }
+#     }))
 
-    response = set_auth_cookies(response, access_token, refresh_token)
-    return response, 200
+#     response = set_auth_cookies(response, access_token, refresh_token)
+#     return response, 200
 
 # @app.route('/verify_2fa', methods=['GET', 'POST'])
 # def verify_2fa():
@@ -642,11 +641,7 @@ def api_register():
             "success": False,
             "message": "An error occurred during registration."
         }), 500
-
-@app.route("/api-tester") # remove after testing
-def api_tester():
-    return render_template("tester_api.html")
-
+    
 # --- Profile Management ---
 # can take from session value also
 @app.route("/api/profile/<int:user_id>", methods=["GET"])
@@ -762,7 +757,7 @@ def upload_media():
             "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         }), 400
 
-    # Limit file size (optional)
+    # Limit file size 
     file.seek(0, os.SEEK_END)
     size_mb = file.tell() / (1024 * 1024)
     file.seek(0)
@@ -791,8 +786,6 @@ def upload_media():
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
-
-
 
 @app.route("/api/posts/<int:user_id>", methods=["GET"])
 def get_user_posts(user_id):
@@ -914,7 +907,7 @@ def api_view_creator_posts(creator_id):
 def api_public_posts():
     try:
         limit = int(request.args.get("limit", 20))
-        # guard-rail for silly large limits
+        # guard-rail for large limits
         limit = max(1, min(limit, 100))
     except ValueError:
         limit = 20
