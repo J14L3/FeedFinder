@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response
+from flask import render_template, request, redirect, url_for, flash, session, jsonify, make_response, send_from_directory # send_from_directory is for test
 from app.hash import hash_password, verify_password
 from app.db import get_db_connection
 from app.session_manager import create_session, invalidate_session, refresh_access_token, verify_refresh_token, verify_session_token, cleanup_expired_sessions
@@ -9,6 +9,9 @@ import re
 import os
 from itsdangerous import URLSafeTimedSerializer
 from app.two_factor import initiate_2fa, verify_2fa_code
+from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename # test
+import uuid # test
 
 
 @app.route('/')
@@ -42,7 +45,7 @@ def login():
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3–20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
             return render_template('login.html')
 
         if len(username) > 50 or len(password) > 100:
@@ -145,6 +148,29 @@ def api_login():
                 "message": "Invalid username or password"
             }), 401
 
+        # âœ… Generate 2FA code
+        two_fa_code = str(random.randint(100000, 999999))
+
+        # Example: send by email
+        send_2fa_email(user['user_email'], two_fa_code)
+
+        # âœ… Store temporary 2FA session info
+        session_token = secrets.token_urlsafe(32)
+        pending_2fa_sessions[session_token] = {
+            "username": username,
+            "user_id": user["user_id"],
+            "user_role": user["user_role"],
+            "code": two_fa_code,
+            "expires": datetime.utcnow() + timedelta(minutes=5)
+        }
+
+        return jsonify({
+            "success": True,
+            "message": f"2FA code sent to {user['user_email']}.",
+            "requires_2fa": True,
+            "session_token": session_token  # returned to frontend to match later
+        }), 200
+
         # Get client info for session security
         ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
         user_agent = request.headers.get('User-Agent', '')
@@ -191,25 +217,65 @@ def api_login():
             "message": "An error occurred during login"
         }), 500
 
-@app.route('/verify_2fa', methods=['GET', 'POST'])
+@app.route('/api/verify-2fa', methods=['POST'])
 def verify_2fa():
-    if request.method == 'POST':
-        code = request.form.get('code')
-        if not code:
-            flash("Please enter your verification code.", "danger")
-            return render_template('verify_2fa.html')
+    data = request.get_json()
+    session_token = data.get('session_token')
+    code = data.get('code')
 
-        valid, message = verify_2fa_code(code)
-        if valid:
-            username = session.pop('pending_user', None)
-            session['user'] = username
-            flash(f"Welcome, {username}! You are now logged in.", "success")
-            return redirect(url_for('index'))
-        else:
-            flash(message, "danger")
-            return render_template('verify_2fa.html')
+    info = pending_2fa_sessions.get(session_token)
+    if not info:
+        return jsonify({"success": False, "message": "Session expired or invalid"}), 400
 
-    return render_template('verify_2fa.html')
+    if datetime.utcnow() > info["expires"]:
+        del pending_2fa_sessions[session_token]
+        return jsonify({"success": False, "message": "2FA code expired"}), 400
+
+    if code != info["code"]:
+        return jsonify({"success": False, "message": "Incorrect 2FA code"}), 401
+
+    # âœ… Create full session now
+    ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0')
+    user_agent = request.headers.get('User-Agent', '')
+
+    access_token, refresh_token, session_id = create_session(
+        info["user_id"], info["username"], info["user_role"], ip_address, user_agent
+    )
+
+    del pending_2fa_sessions[session_token]
+
+    response = make_response(jsonify({
+        "success": True,
+        "message": f"Welcome {info['username']}!",
+        "user": {
+            "id": info["user_id"],
+            "username": info["username"],
+            "role": info["user_role"]
+        }
+    }))
+
+    response = set_auth_cookies(response, access_token, refresh_token)
+    return response, 200
+
+# @app.route('/verify_2fa', methods=['GET', 'POST'])
+# def verify_2fa():
+#     if request.method == 'POST':
+#         code = request.form.get('code')
+#         if not code:
+#             flash("Please enter your verification code.", "danger")
+#             return render_template('verify_2fa.html')
+
+#         valid, message = verify_2fa_code(code)
+#         if valid:
+#             username = session.pop('pending_user', None)
+#             session['user'] = username
+#             flash(f"Welcome, {username}! You are now logged in.", "success")
+#             return redirect(url_for('index'))
+#         else:
+#             flash(message, "danger")
+#             return render_template('verify_2fa.html')
+
+#     return render_template('verify_2fa.html')
 
 
 @app.route('/api/logout', methods=['POST', 'OPTIONS'])
@@ -381,7 +447,7 @@ def register():
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3–20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
             return render_template('register.html')
 
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
@@ -594,34 +660,14 @@ def get_profile(user_id):
             "message": "Database connection failed."
         }), 500
 
-    try:
-        db_query = connection.cursor(dictionary=True)
-        # view profile query with user_id
-        db_query.execute("SELECT user_id, user_name, user_email, bio, profile_picture, is_private, created_at FROM user WHERE user_id=%s", (user_id,))
-        profile = db_query.fetchone()
-        
-        if profile:
-            # Check if user has active premium membership
-            db_query.execute("""
-                SELECT membership_type 
-                FROM membership 
-                WHERE user_id = %s AND is_active = 1 
-                AND end_date > NOW()
-                ORDER BY end_date DESC 
-                LIMIT 1
-            """, (user_id,))
-            membership = db_query.fetchone()
-            is_premium = membership and membership['membership_type'] == 'premium'
-            
-            profile['is_premium'] = is_premium
-            if profile.get('created_at'):
-                profile['created_at'] = profile['created_at'].isoformat()
-            
-            return jsonify(profile)
-        return jsonify({"error": "User not found"}), 404
-    finally:
-        db_query.close()
-        connection.close()
+    db_query = connection.cursor(dictionary=True)
+    # view profile query with user_id
+    db_query.execute("SELECT user_id, user_name, user_email, bio, profile_picture, is_private FROM user WHERE user_id=%s", (user_id,))
+    profile = db_query.fetchone(); db_query.close(); connection.close()
+
+    if profile:
+        return jsonify(profile)
+    return jsonify({"error": "User not found"}), 404
 
 @app.route("/api/profile/by-email", methods=["GET"])
 def get_profile_by_email():
@@ -689,6 +735,64 @@ def create_post():
     db_query.execute("INSERT INTO post (user_id, content_text, media_url, privacy) VALUES (%s,%s,%s,%s)", (user_id, text, media, privacy))
     connection.commit(); db_query.close(); connection.close()
     return jsonify({"message": "Post created successfully."})
+
+# media upload directory
+UPLOAD_FOLDER = "/var/www/feedfinder/uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "mp4", "mov", "webm"}
+MAX_FILE_SIZE_MB = 20
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# --- upload media ---
+@app.route("/api/upload", methods=["POST"])
+def upload_media():
+    if "file" not in request.files:
+        return jsonify({"success": False, "message": "No file part in request"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"success": False, "message": "No file selected"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({
+            "success": False,
+            "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        }), 400
+
+    # Limit file size (optional)
+    file.seek(0, os.SEEK_END)
+    size_mb = file.tell() / (1024 * 1024)
+    file.seek(0)
+    if size_mb > MAX_FILE_SIZE_MB:
+        return jsonify({"success": False, "message": "File too large"}), 400
+
+    # Secure filename
+    ext = file.filename.rsplit(".", 1)[1].lower()
+    unique_name = f"{uuid.uuid4().hex}.{ext}"
+    save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    try:
+        file.save(save_path)
+        media_url = f"/uploads/{unique_name}"  # relative URL for frontend
+        return jsonify({
+            "success": True,
+            "message": "File uploaded successfully",
+            "media_url": media_url
+        }), 201
+    except Exception as e:
+        print("Upload error:", e)
+        return jsonify({"success": False, "message": "Failed to save file"}), 500
+
+# lets frontend load media directly from the path below
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
 
 @app.route("/api/posts/<int:user_id>", methods=["GET"])
 def get_user_posts(user_id):
@@ -764,116 +868,10 @@ def api_delete_post(post_id):
 # --- Post Visibility (public / friends / exclusive) ---
 @app.route("/api/posts/user/<int:creator_id>", methods=["GET"])  # query: ?viewer=<viewer_id>
 def api_view_creator_posts(creator_id):
-    viewer_id = request.args.get("viewer")
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
     try:
-        db_query = connection.cursor(dictionary=True)
-        
-        # Get user info for author data
-        db_query.execute("SELECT user_id, user_name, profile_picture FROM user WHERE user_id=%s", (creator_id,))
-        user = db_query.fetchone()
-        
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-        
-        # If viewing own posts, show all
-        if viewer_id and int(viewer_id) == creator_id:
-            db_query.execute(
-                """
-                SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at,
-                       COUNT(DISTINCT pl.user_id) as like_count
-                FROM post p
-                LEFT JOIN post_like pl ON p.post_id = pl.post_id
-                WHERE p.user_id=%s
-                GROUP BY p.post_id
-                ORDER BY p.created_at DESC
-                """,
-                (creator_id,)
-            )
-        elif viewer_id:
-            # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
-            try:
-                viewer_id_int = int(viewer_id)
-                db_query.execute(
-                    """
-                    SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at,
-                           COUNT(DISTINCT pl.user_id) as like_count
-                    FROM post p
-                    LEFT JOIN post_like pl ON p.post_id = pl.post_id
-                    WHERE p.user_id=%s
-                      AND (
-                        p.privacy='public'
-                        OR (p.privacy='friends' AND EXISTS (
-                            SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
-                        ))
-                        OR (p.privacy='exclusive' AND EXISTS (
-                            SELECT 1 FROM subscription s
-                            WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
-                                  AND NOW() BETWEEN s.start_date AND s.end_date
-                        ))
-                      )
-                    GROUP BY p.post_id
-                    ORDER BY p.created_at DESC
-                    """,
-                    (creator_id, viewer_id_int, creator_id, viewer_id_int, creator_id)
-                )
-            except (TypeError, ValueError):
-                # Invalid viewer_id, show only public posts
-                db_query.execute(
-                    """
-                    SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at,
-                           COUNT(DISTINCT pl.user_id) as like_count
-                    FROM post p
-                    LEFT JOIN post_like pl ON p.post_id = pl.post_id
-                    WHERE p.user_id=%s AND p.privacy='public'
-                    GROUP BY p.post_id
-                    ORDER BY p.created_at DESC
-                    """,
-                    (creator_id,)
-                )
-        else:
-            # Not logged in, show only public posts
-            db_query.execute(
-                """
-                SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at,
-                       COUNT(DISTINCT pl.user_id) as like_count
-                FROM post p
-                LEFT JOIN post_like pl ON p.post_id = pl.post_id
-                WHERE p.user_id=%s AND p.privacy='public'
-                GROUP BY p.post_id
-                ORDER BY p.created_at DESC
-                """,
-                (creator_id,)
-            )
-        
-        posts = db_query.fetchall()
-        
-        # Add author info to each post
-        for post in posts:
-            post['author'] = {
-                'user_id': user['user_id'],
-                'user_name': user['user_name'],
-                'profile_picture': user['profile_picture']
-            }
-            if post.get('created_at'):
-                post['created_at'] = post['created_at'].isoformat()
-        
-        return jsonify(posts)
-    finally:
-        db_query.close()
-        connection.close()
-
-# --- Likes & Comments ---
-@app.route("/api/posts/<int:post_id>/like", methods=["POST"])  # body: { user_id }
-def api_like_post(post_id):
-    data = request.get_json(); user_id = int(data.get("user_id"))
+        viewer_id = int(request.args.get("viewer"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Missing or invalid viewer id"}), 400
     # Connect to DB
     connection = get_db_connection()
     if connection is None:
@@ -883,12 +881,99 @@ def api_like_post(post_id):
         }), 500
     
     db_query = connection.cursor(dictionary=True)
-    try: # give likes query
-        db_query.execute("INSERT IGNORE INTO post_like (user_id, post_id) VALUES (%s,%s)", (user_id, post_id))
-        connection.commit()
-        return jsonify({"message": "Liked."}), 201
+    # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
+    # view other posts with logic implemented in sql query
+    # works with exclusive subcription and friends posts
+    try: 
+        db_query.execute(
+            """
+            SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at
+            FROM post p
+            WHERE p.user_id=%s
+              AND (
+                p.privacy='public'
+                OR (p.privacy='friends' AND EXISTS (
+                    SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
+                ))
+                OR (p.privacy='exclusive' AND EXISTS (
+                    SELECT 1 FROM subscription s
+                    WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
+                          AND NOW() BETWEEN s.start_date AND s.end_date
+                ))
+              )
+            ORDER BY p.created_at DESC
+            """,
+            (creator_id, viewer_id, creator_id, viewer_id, creator_id)
+        )
+        return jsonify(db_query.fetchall())
     finally:
         db_query.close(); connection.close()
+        
+# --- get random public posts and display ---
+@app.route("/api/posts/public", methods=["GET"])
+def api_public_posts():
+    try:
+        limit = int(request.args.get("limit", 20))
+        # guard-rail for silly large limits
+        limit = max(1, min(limit, 100))
+    except ValueError:
+        limit = 20
+
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+
+    try:
+        db_query = connection.cursor(dictionary=True)
+        # Include author name/username; only privacy='public'
+        db_query.execute(
+            """
+            SELECT 
+              p.post_id,
+              p.user_id,
+              p.content_text,
+              p.media_url,
+              p.privacy,
+              p.created_at,
+              u.user_name,
+              u.user_email
+            FROM post p
+            JOIN user u ON u.user_id = p.user_id
+            WHERE p.privacy = 'public'
+            ORDER BY RAND()
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        rows = db_query.fetchall()
+        return jsonify({"success": True, "items": rows})
+    finally:
+        db_query.close()
+        connection.close()
+
+# --- Likes & Comments ---
+# @app.route("/api/posts/<int:post_id>/like", methods=["POST"])  # body: { user_id }
+# def api_like_post(post_id):
+#     data = request.get_json(); user_id = int(data.get("user_id"))
+#     # Connect to DB
+#     connection = get_db_connection()
+#     if connection is None:
+#         return jsonify({
+#             "success": False,
+#             "message": "Database connection failed."
+#         }), 500
+    
+#     db_query = connection.cursor(dictionary=True)
+#     try: # give likes query
+#         db_query.execute("INSERT IGNORE INTO post_like (user_id, post_id) VALUES (%s,%s)", (user_id, post_id))
+#         connection.commit()
+#         return jsonify({"message": "Liked."}), 201
+#     finally:
+#         db_query.close(); connection.close()
 
 # @app.route("/api/posts/<int:post_id>/comment", methods=["POST"])  # body: { user_id, comment_text }
 # def api_comment_post(post_id):
@@ -947,209 +1032,68 @@ def view_rating(email):
     return jsonify({"message": "No ratings yet."})
 
 # --- Friendship Management ---
-@app.route("/api/friends/<int:user_id>", methods=["GET"])
-def get_friends(user_id):
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
+# @app.route("/api/friends/<int:user_id>", methods=["GET"])
+# def get_friends(user_id):
+#     # Connect to DB
+#     connection = get_db_connection()
+#     if connection is None:
+#         return jsonify({
+#             "success": False,
+#             "message": "Database connection failed."
+#         }), 500
     
-    try:
-        db_query = connection.cursor(dictionary=True)
-        # view all friends query (who this user follows)
-        db_query.execute("SELECT u.user_id, u.user_name, u.user_email FROM friends f JOIN user u ON u.user_id=f.friend_user_id WHERE f.user_id=%s", (user_id,))
-        friends = db_query.fetchall()
-        return jsonify(friends)
-    finally:
-        db_query.close()
-        connection.close()
+#     db_query = connection.cursor(dictionary=True)
+#     # view all friends query
+#     db_query.execute("SELECT u.user_id, u.user_name, u.user_email FROM friends f JOIN user u ON u.user_id=f.friend_user_id WHERE f.user_id=%s", (user_id,))
+#     friends = db_query.fetchall(); db_query.close(); connection.close()
+#     return jsonify(friends)
 
-@app.route("/api/profile/<int:user_id>/stats", methods=["GET"])
-def get_profile_stats(user_id):
-    """Get profile statistics (posts, ratings, followers, etc.)"""
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
+# @app.route("/api/friends/add", methods=["POST"])  # body: { user_id, other_user_id }
+# def api_add_friend():
+#     data = request.get_json()
+#     user_id = int(data.get("user_id"))
+#     other = int(data.get("other_user_id"))
+#     # Connect to DB
+#     connection = get_db_connection()
+#     if connection is None:
+#         return jsonify({
+#             "success": False,
+#             "message": "Database connection failed."
+#         }), 500
     
-    try:
-        db_query = connection.cursor(dictionary=True)
-        
-        # Get post count
-        db_query.execute("SELECT COUNT(*) as count FROM post WHERE user_id = %s", (user_id,))
-        post_count = db_query.fetchone()['count']
-        
-        # Get total likes (sum of all likes on user's posts)
-        db_query.execute("""
-            SELECT COUNT(*) as count 
-            FROM post_like pl
-            JOIN post p ON pl.post_id = p.post_id
-            WHERE p.user_id = %s
-        """, (user_id,))
-        total_likes = db_query.fetchone()['count']
-        
-        # Get comment count
-        db_query.execute("""
-            SELECT COUNT(*) as count
-            FROM comment c
-            JOIN post p ON c.post_id = p.post_id
-            WHERE p.user_id = %s
-        """, (user_id,))
-        comment_count = db_query.fetchone()['count']
-        
-        # Get rating statistics (rating table uses 1-10 scale)
-        db_query.execute("""
-            SELECT 
-                COUNT(*) as total_ratings,
-                AVG(rating_value) as average_rating
-            FROM rating
-            WHERE rated_user_id = %s
-        """, (user_id,))
-        rating_stats = db_query.fetchone()
-        total_ratings = rating_stats['total_ratings'] or 0
-        # Convert from 1-10 scale to 1-5 scale (divide by 2)
-        average_rating = (float(rating_stats['average_rating']) / 2.0) if rating_stats['average_rating'] else 0.0
-        
-        # Get followers count (users who have this user as a friend)
-        db_query.execute("SELECT COUNT(*) as count FROM friends WHERE friend_user_id = %s", (user_id,))
-        followers = db_query.fetchone()['count']
-        
-        # Get following count (users this user follows)
-        db_query.execute("SELECT COUNT(*) as count FROM friends WHERE user_id = %s", (user_id,))
-        following = db_query.fetchone()['count']
-        
-        stats = {
-            "totalPosts": post_count,
-            "totalLikes": total_likes,
-            "totalComments": comment_count,
-            "totalRatings": total_ratings,
-            "averageRating": round(average_rating, 1),
-            "totalDonations": 0,  # No donation table in schema
-            "monthlyDonations": 0,
-            "topDonation": 0,
-            "followers": followers,
-            "following": following
-        }
-        
-        return jsonify({
-            "success": True,
-            "stats": stats
-        }), 200
-        
-    except Exception as e:
-        print(f"Error fetching profile stats: {e}")
-        return jsonify({
-            "success": False,
-            "message": "An error occurred"
-        }), 500
-    finally:
-        db_query.close()
-        connection.close()
+#     try: # add friends query simultaneously
+#         db_query = connection.cursor(dictionary=True)
+#         db_query.execute("INSERT IGNORE INTO friends (user_id, friend_user_id) VALUES (%s,%s)", (user_id, other))
+#         db_query.execute("INSERT IGNORE INTO friends (user_id, friend_user_id) VALUES (%s,%s)", (other, user_id))
+#         connection.commit()
+#         return jsonify({"message": "Friendship added (both directions)."}), 201
+#     finally:
+#         db_query.close(); connection.close()
 
-@app.route("/api/posts/public", methods=["GET"])
-def get_public_posts():
-    """Get all public posts"""
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
+# @app.route("/api/friends/remove", methods=["DELETE"])  # body: { user_id, other_user_id }
+# def api_remove_friend():
+#     data = request.get_json()
+#     user_id = int(data.get("user_id"))
+#     other = int(data.get("other_user_id"))
+#     # Connect to DB
+#     connection = get_db_connection()
+#     if connection is None:
+#         return jsonify({
+#             "success": False,
+#             "message": "Database connection failed."
+#         }), 500
     
-    try:
-        db_query = connection.cursor(dictionary=True)
-        db_query.execute("""
-            SELECT p.post_id, p.user_id, p.content_text, p.media_url, p.privacy, p.created_at,
-                   u.user_name, u.user_email
-            FROM post p
-            JOIN user u ON p.user_id = u.user_id
-            WHERE p.privacy = 'public'
-            ORDER BY p.created_at DESC
-            LIMIT 50
-        """)
-        posts = db_query.fetchall()
-        
-        # Format posts
-        items = []
-        for post in posts:
-            items.append({
-                "post_id": post['post_id'],
-                "user_id": post['user_id'],
-                "user_name": post['user_name'],
-                "user_email": post['user_email'],
-                "content_text": post['content_text'],
-                "media_url": post['media_url'],
-                "privacy": post['privacy'],
-                "created_at": post['created_at'].isoformat() if post['created_at'] else None
-            })
-        
-        return jsonify({
-            "success": True,
-            "items": items
-        }), 200
-    except Exception as e:
-        print(f"Error fetching public posts: {e}")
-        return jsonify({
-            "success": False,
-            "message": "An error occurred"
-        }), 500
-    finally:
-        db_query.close()
-        connection.close()
-
-@app.route("/api/friends/add", methods=["POST"])  # body: { user_id, other_user_id }
-def api_add_friend():
-    data = request.get_json()
-    user_id = int(data.get("user_id"))
-    other = int(data.get("other_user_id"))
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
-    try: # add friends query simultaneously
-        db_query = connection.cursor(dictionary=True)
-        db_query.execute("INSERT IGNORE INTO friends (user_id, friend_user_id) VALUES (%s,%s)", (user_id, other))
-        db_query.execute("INSERT IGNORE INTO friends (user_id, friend_user_id) VALUES (%s,%s)", (other, user_id))
-        connection.commit()
-        return jsonify({"message": "Friendship added (both directions)."}), 201
-    finally:
-        db_query.close(); connection.close()
-
-@app.route("/api/friends/remove", methods=["DELETE"])  # body: { user_id, other_user_id }
-def api_remove_friend():
-    data = request.get_json()
-    user_id = int(data.get("user_id"))
-    other = int(data.get("other_user_id"))
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
-    try: # remove friends query simultaneously
-        db_query = connection.cursor(dictionary=True)
-        db_query.execute("""
-            DELETE FROM friends
-            WHERE (user_id=%s AND friend_user_id=%s)
-               OR (user_id=%s AND friend_user_id=%s)
-        """, (user_id, other, other, user_id))
-        connection.commit()
-        return jsonify({"message": "Friendship removed."})
-    finally:
-        db_query.close(); connection.close()
+#     try: # remove friends query simultaneously
+#         db_query = connection.cursor(dictionary=True)
+#         db_query.execute("""
+#             DELETE FROM friends
+#             WHERE (user_id=%s AND friend_user_id=%s)
+#                OR (user_id=%s AND friend_user_id=%s)
+#         """, (user_id, other, other, user_id))
+#         connection.commit()
+#         return jsonify({"message": "Friendship removed."})
+#     finally:
+#         db_query.close(); connection.close()
 
 # --- Subscription / Membership (simulated) ---
 @app.route("/api/subscribe", methods=["POST"])  # body: { subscriber_id, creator_id }
