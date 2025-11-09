@@ -44,7 +44,7 @@ def login():
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3–20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
             return render_template('login.html')
 
         if len(username) > 50 or len(password) > 100:
@@ -446,7 +446,7 @@ def register():
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3–20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
             return render_template('register.html')
 
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
