@@ -10,7 +10,7 @@ import hashlib
 import time
 from datetime import datetime, timedelta
 from flask import request, jsonify
-from app.db import get_db_connection, create_query_executor
+from app.db import get_db_connection
 import os
 
 
@@ -160,7 +160,7 @@ def create_session(user_id, username, ip_address, user_agent):
         if not connection:
             return None, None, None
         
-        db_query = create_query_executor(connection, dictionary=True)
+        db_query = connection.cursor(dictionary=True)
         
         # Generate tokens
         access_token, session_id = generate_session_token(user_id, username, ip_address, user_agent)
@@ -222,7 +222,7 @@ def invalidate_session(session_id, user_id=None):
         return False
     
     try:
-        db_query = create_query_executor(connection)
+        db_query = connection.cursor()
         
         if user_id:
             # Invalidate all sessions for a user (logout from all devices)
@@ -261,7 +261,7 @@ def is_session_valid(session_id, user_id):
         return False
     
     try:
-        db_query = create_query_executor(connection, dictionary=True)
+        db_query = connection.cursor(dictionary=True)
         
         query = """
             SELECT * FROM sessions 
@@ -299,7 +299,7 @@ def refresh_access_token(refresh_token):
         return None, None, "Database connection failed"
     
     try:
-        db_query = create_query_executor(connection, dictionary=True)
+        db_query = connection.cursor(dictionary=True)
         db_query.execute("SELECT user_name FROM user WHERE user_id = %s", (user_id,))
         user = db_query.fetchone()
         db_query.close()
@@ -334,7 +334,7 @@ def create_sessions_table_if_not_exists():
         return False
     
     try:
-        db_query = create_query_executor(connection)
+        db_query = connection.cursor()
         
         create_table_query = """
             CREATE TABLE IF NOT EXISTS sessions (
@@ -382,7 +382,7 @@ def cleanup_expired_sessions():
         return
     
     try:
-        db_query = create_query_executor(connection)
+        db_query = connection.cursor()
         delete_query = "DELETE FROM sessions WHERE expires_at < NOW() OR is_active = 0"
         db_query.execute(delete_query)
         connection.commit()

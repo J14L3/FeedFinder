@@ -19,10 +19,3 @@ def get_db_connection():
     except Error as e:
         print(f"Error: {e}")
         return None
-
-def create_query_executor(connection, dictionary=False):
-    """
-    Create a database query executor for executing SQL queries.
-    Returns a query executor object that can execute SQL and fetch results.
-    """
-    return connection.cursor(dictionary=dictionary)
