@@ -36,7 +36,7 @@ app.config.update(
     BASE_URL=os.getenv('BASE_URL'),
     # Session configuration for security
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=86400  # 24 hours
 )
