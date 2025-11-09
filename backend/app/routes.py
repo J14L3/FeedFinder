@@ -903,43 +903,74 @@ def allowed_file(filename):
 # --- upload media ---
 @app.route("/api/upload", methods=["POST"])
 def upload_media():
-    if "file" not in request.files:
-        return jsonify({"success": False, "message": "No file part in request"}), 400
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"success": False, "message": "No file selected"}), 400
-
-    if not allowed_file(file.filename):
-        return jsonify({
-            "success": False,
-            "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
-        }), 400
-
-    # Limit file size 
-    file.seek(0, os.SEEK_END)
-    size_mb = file.tell() / (1024 * 1024)
-    file.seek(0)
-    if size_mb > MAX_FILE_SIZE_MB:
-        return jsonify({"success": False, "message": "File too large"}), 400
-
-    # Secure filename
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    unique_name = f"{uuid.uuid4().hex}.{ext}"
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
     try:
-        file.save(save_path)
-        media_url = f"/uploads/{unique_name}"  # relative URL for frontend
+        # ensure upload directory exists
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+        # check if file is in the request
+        if "file" not in request.files:
+            return jsonify({"success": False, "message": "No file part in request"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"success": False, "message": "No file selected"}), 400
+
+        # validate file type
+        if not allowed_file(file.filename):
+            return jsonify({
+                "success": False,
+                "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            }), 400
+
+        # enforce file size limit
+        file.seek(0, os.SEEK_END)
+        size_mb = file.tell() / (1024 * 1024)
+        file.seek(0)
+        if size_mb > MAX_FILE_SIZE_MB:
+            return jsonify({"success": False, "message": f"File too large ({size_mb:.2f}MB). Limit: {MAX_FILE_SIZE_MB}MB"}), 400
+
+        # save file securely
+        ext = file.filename.rsplit(".", 1)[1].lower()
+        unique_name = f"{uuid.uuid4().hex}.{ext}"
+        save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
+
+        try:
+            file.save(save_path)
+        except PermissionError as e:
+            print(f"[UPLOAD ERROR] Permission denied: {e}")
+            return jsonify({
+                "success": False,
+                "message": f"Permission denied when saving file to {save_path}. Check folder ownership and chmod."
+            }), 500
+        except FileNotFoundError as e:
+            print(f"[UPLOAD ERROR] Folder not found: {e}")
+            return jsonify({
+                "success": False,
+                "message": f"Upload folder not found: {app.config['UPLOAD_FOLDER']}"
+            }), 500
+        except Exception as e:
+            print(f"[UPLOAD ERROR] Unexpected: {e}")
+            return jsonify({
+                "success": False,
+                "message": f"Unexpected error while saving file: {str(e)}"
+            }), 500
+
+        # unique media URL
+        media_url = f"/uploads/{unique_name}"  # relative for frontend
+
         return jsonify({
             "success": True,
             "message": "File uploaded successfully",
             "media_url": media_url
         }), 201
+
     except Exception as e:
-        print("Upload error:", e)
-        return jsonify({"success": False, "message": "Failed to save file"}), 500
+        print(f"[UPLOAD ERROR] Outer catch: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Unexpected server error: {str(e)}"
+        }), 500
+
 
 # lets frontend load media directly from the path below
 @app.route("/uploads/<path:filename>")
