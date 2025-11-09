@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings } from 'lucide-react';
+import { API_BASE } from './config'; // test
 import CreatePostModal from './CreatePostModal';
 import DonateModal from './DonateModal';
 import RatingModal from './RatingModal';
@@ -32,6 +33,10 @@ const FeedFinder = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  // test
+  const [posts, setPosts] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  const [feedError, setFeedError] = useState("");
   const userMenuRef = useRef(null);
 
   // Check authentication status on mount
@@ -69,101 +74,154 @@ const FeedFinder = () => {
     };
   }, [showUserMenu]);
 
-  // Sample posts data
-  const posts = [
-    {
-      id: 1,
-      author: {
-        name: 'Lee Yong Zhang',
-        username: '@lyz',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-        rating: 4.8,
-        verified: true,
-        isPremium: true
-      },
-      type: 'image',
-      content: imagesByName['yz.jpg'] || '',
-      caption: 'Look at my tattoo! Hit me up if you want some! 💙',
-      timestamp: '2h ago',
-      likes: 1247,
-      comments: 89,
-      isExclusive: false
-    },
-    {
-      id: 2,
-      author: {
-        name: 'Mike Chen',
-        username: '@mikechen',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-        rating: 4.5,
-        verified: false,
-        isPremium: false
-      },
-      type: 'video',
-      content: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&h=800&fit=crop',
-      caption: 'Behind the scenes of my latest video! Check out my exclusive content for more 🎬',
-      timestamp: '5h ago',
-      likes: 892,
-      comments: 45,
-      isExclusive: true
-    },
-    {
-      id: 3,
-      author: {
-        name: 'Emma Williams',
-        username: '@emmaw',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emma',
-        rating: 4.9,
-        verified: true,
-        isPremium: true
-      },
-      type: 'image',
-      content: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&h=800&fit=crop',
-      caption: 'Feeling grateful for all the support! Your donations help me create better content 🙏',
-      timestamp: '8h ago',
-      likes: 2103,
-      comments: 156,
-      isExclusive: false
-    },
-    {
-      id: 4,
-      author: {
-        name: 'David Martinez',
-        username: '@davidm',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
-        rating: 4.2,
-        verified: false,
-        isPremium: false
-      },
-      type: 'text',
-      content: '',
-      caption: 'Just want to share my thoughts on building meaningful connections in the digital age. Sometimes the best conversations happen when we take the time to truly understand each other. What are your thoughts?',
-      timestamp: '12h ago',
-      likes: 456,
-      comments: 78,
-      isExclusive: false
-    },
-    {
-      id: 5,
-      author: {
-        name: 'Lisa Anderson',
-        username: '@lisaa',
-        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-        rating: 4.7,
-        verified: true,
-        isPremium: true
-      },
-      type: 'image',
-      content: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=800&h=800&fit=crop',
-      caption: 'New exclusive content dropping this week! Premium members get early access ✨',
-      timestamp: '1d ago',
-      likes: 1789,
-      comments: 234,
-      isExclusive: true
-    }
-  ];
+  // Fetch dynamic posts from backend
+  useEffect(() => {
+    if (!isCheckingAuth && isLoggedIn && activeTab === 'home') {
+      const fetchPosts = async () => {
+        setLoadingFeed(true);
+        setFeedError("");
+        try {
+          const res = await fetch(`${API_BASE}/api/posts/public`);
+          const data = await res.json();
 
-  const filteredPosts = posts.filter(post => 
+          if (!res.ok || !data?.success) {
+            throw new Error(data?.message || 'Failed to load posts');
+          }
+
+          // Map backend rows into PostCards format
+          const mapped = data.items.map(p => ({
+            id: p.post_id,
+            author: {
+              name: p.user_name || 'User',
+              username: p.user_email ? `@${p.user_email.split('@')[0]}` : '@user',
+              avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=User',
+              rating: 0,
+              verified: false,
+              isPremium: false
+            },
+            type: p.media_url ? 'image' : 'text',
+            content: p.media_url || '',
+            caption: p.content_text || '',
+            timestamp: new Date(p.created_at).toLocaleString(),
+            // likes: 0,
+            // comments: 0,
+            isExclusive: false
+          }));
+
+          setPosts(mapped);
+        } catch (err) {
+          console.error(err);
+          setFeedError(err.message || 'Could not fetch posts');
+        } finally {
+          setLoadingFeed(false);
+        }
+      };
+
+      fetchPosts();
+    }
+  }, [isCheckingAuth, isLoggedIn, activeTab]);
+
+  // Sample posts data
+  // const posts = [
+  // {
+  //   id: 1,
+  //   author: {
+  //     name: 'Lee Yong Zhang',
+  //     username: '@lyz',
+  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
+  //     rating: 4.8,
+  //     verified: true,
+  //     isPremium: true
+  //   },
+  //   type: 'image',
+  //   content: imagesByName['yz.jpg'] || '',
+  //   caption: 'Look at my tattoo! Hit me up if you want some! 💙',
+  //   timestamp: '2h ago',
+  //   likes: 1247,
+  //   comments: 89,
+  //   isExclusive: false
+  // },
+  // {
+  //   id: 2,
+  //   author: {
+  //     name: 'Mike Chen',
+  //     username: '@mikechen',
+  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
+  //     rating: 4.5,
+  //     verified: false,
+  //     isPremium: false
+  //   },
+  //   type: 'video',
+  //   content: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&h=800&fit=crop',
+  //   caption: 'Behind the scenes of my latest video! Check out my exclusive content for more 🎬',
+  //   timestamp: '5h ago',
+  //   likes: 892,
+  //   comments: 45,
+  //   isExclusive: true
+  // },
+  // {
+  //   id: 3,
+  //   author: {
+  //     name: 'Emma Williams',
+  //     username: '@emmaw',
+  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emma',
+  //     rating: 4.9,
+  //     verified: true,
+  //     isPremium: true
+  //   },
+  //   type: 'image',
+  //   content: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&h=800&fit=crop',
+  //   caption: 'Feeling grateful for all the support! Your donations help me create better content 🙏',
+  //   timestamp: '8h ago',
+  //   likes: 2103,
+  //   comments: 156,
+  //   isExclusive: false
+  // },
+  // {
+  //   id: 4,
+  //   author: {
+  //     name: 'David Martinez',
+  //     username: '@davidm',
+  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
+  //     rating: 4.2,
+  //     verified: false,
+  //     isPremium: false
+  //   },
+  //   type: 'text',
+  //   content: '',
+  //   caption: 'Just want to share my thoughts on building meaningful connections in the digital age. Sometimes the best conversations happen when we take the time to truly understand each other. What are your thoughts?',
+  //   timestamp: '12h ago',
+  //   likes: 456,
+  //   comments: 78,
+  //   isExclusive: false
+  // },
+  // {
+  //   id: 5,
+  //   author: {
+  //     name: 'Lisa Anderson',
+  //     username: '@lisaa',
+  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
+  //     rating: 4.7,
+  //     verified: true,
+  //     isPremium: true
+  //   },
+  //   type: 'image',
+  //   content: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=800&h=800&fit=crop',
+  //   caption: 'New exclusive content dropping this week! Premium members get early access ✨',
+  //   timestamp: '1d ago',
+  //   likes: 1789,
+  //   comments: 234,
+  //   isExclusive: true
+  // }
+  // ];
+
+  // const filteredPosts = posts.filter(post => 
+  //   post.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  //   post.author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  //   post.caption.toLowerCase().includes(searchQuery.toLowerCase())
+  // );
+
+  const filteredPosts = posts.filter(post =>
     post.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     post.caption.toLowerCase().includes(searchQuery.toLowerCase())
@@ -185,14 +243,14 @@ const FeedFinder = () => {
   if (!isLoggedIn) {
     if (showRegisterPage) {
       return (
-        <RegisterPage 
+        <RegisterPage
           setShowLoginModal={() => setShowRegisterPage(false)}
           setIsLoggedIn={setIsLoggedIn}
         />
       );
     }
     return (
-      <LoginPage 
+      <LoginPage
         setShowRegisterModal={() => setShowRegisterPage(true)}
         setIsLoggedIn={setIsLoggedIn}
       />
@@ -264,7 +322,7 @@ const FeedFinder = () => {
                 </button>
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[100] animate-slideUp">
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveTab('upload');
                         setShowUserMenu(false);
@@ -278,7 +336,7 @@ const FeedFinder = () => {
                       <User size={18} />
                       Profile
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveTab('settings');
                         setShowUserMenu(false);
@@ -289,7 +347,7 @@ const FeedFinder = () => {
                       Settings
                     </button>
                     {!isPremium && (
-                      <button 
+                      <button
                         onClick={() => {
                           setActiveTab('premium');
                           setShowUserMenu(false);
@@ -301,27 +359,27 @@ const FeedFinder = () => {
                       </button>
                     )}
                     <hr className="my-2" />
-                        <button
-                          onClick={async () => {
-                            try {
-                              const { logout } = await import('./authService');
-                              const success = await logout();
-                              if (success) {
-                                setIsLoggedIn(false);
-                                setShowUserMenu(false);
-                              }
-                            } catch (error) {
-                              console.error('Error logging out:', error);
-                              // Still logout locally even if API call fails
-                              setIsLoggedIn(false);
-                              setShowUserMenu(false);
-                            }
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
-                        >
-                          <LogOut size={18} />
-                          Logout
-                        </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const { logout } = await import('./authService');
+                          const success = await logout();
+                          if (success) {
+                            setIsLoggedIn(false);
+                            setShowUserMenu(false);
+                          }
+                        } catch (error) {
+                          console.error('Error logging out:', error);
+                          // Still logout locally even if API call fails
+                          setIsLoggedIn(false);
+                          setShowUserMenu(false);
+                        }
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                    >
+                      <LogOut size={18} />
+                      Logout
+                    </button>
                   </div>
                 )}
               </div>
@@ -338,7 +396,7 @@ const FeedFinder = () => {
               <Crown size={20} />
               <span className="text-sm font-medium">Upgrade to Premium for unlimited ratings and exclusive content!</span>
             </div>
-            <button 
+            <button
               onClick={() => setActiveTab('premium')}
               className="px-4 py-1 bg-white text-orange-600 rounded-full text-sm font-semibold hover:bg-gray-100 transition"
             >
@@ -367,24 +425,35 @@ const FeedFinder = () => {
             <p className="text-gray-600">Profile page coming soon...</p>
           </div>
         ) : (
-          <>
-            {filteredPosts.length === 0 ? (
-              <div className="text-center py-12">
-                <Search size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600">No posts found matching your search</p>
-              </div>
-            ) : (
-              filteredPosts.map(post => (
-                <PostCards
-                  key={post.id}
-                  post={post}
-                  setShowDonateModal={setShowDonateModal}
-                  setShowRatingModal={setShowRatingModal}
-                  isLoggedIn={isLoggedIn}
-                  isPremium={isPremium}
-                />
-              ))
-            )}
+          <>    
+            {
+              loadingFeed ? (
+                <div className="text-center py-12">
+                  <div className="w-10 h-10 border-4 border-gray-300 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading posts...</p>
+                </div>
+              ) : feedError ? (
+                <div className="text-center py-12 text-red-600">
+                  {feedError}
+                </div>
+              ) : filteredPosts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Search size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600">No public posts available</p>
+                </div>
+              ) : (
+                filteredPosts.map(post => (
+                  <PostCards
+                    key={post.id}
+                    post={post}
+                    setShowDonateModal={setShowDonateModal}
+                    setShowRatingModal={setShowRatingModal}
+                    isLoggedIn={isLoggedIn}
+                    isPremium={isPremium}
+                  />
+                ))
+              )
+            }
           </>
         )}
       </main>
