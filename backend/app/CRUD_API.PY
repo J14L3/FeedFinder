@@ -1,7 +1,8 @@
+from . import app   # uses the app defined in app/__init__.py (testing)
 from flask import Flask, request, jsonify, render_template # remove render_template after testing
 import mysql.connector
 
-app = Flask(__name__)
+
 
 # --- Database Configuration ---
 DB_CFG = dict(

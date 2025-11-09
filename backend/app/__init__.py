@@ -45,3 +45,4 @@ app.config.update(
 mail = Mail(app)
 
 from app import routes
+from . import CRUD_API # testing
