@@ -149,10 +149,12 @@ def api_login():
         ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
         user_agent = request.headers.get('User-Agent', '')
         
+        
         # Create session and generate tokens
         access_token, refresh_token, session_id = create_session(
             user['user_id'],
             user['user_name'],
+            user['user_role'],
             ip_address,
             user_agent
         )
@@ -170,7 +172,8 @@ def api_login():
             "user": {
                 "id": user['user_id'],
                 "username": user['user_name'],
-                "email": user.get('user_email', '')
+                "email": user.get('user_email', ''),
+                "role": user['user_role']
             }
         }))
 
@@ -291,12 +294,11 @@ def api_refresh():
     }))
     
     # Set new access token cookie (keep refresh token)
-    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
     response.set_cookie(
         'access_token',
         access_token,
         httponly=True,
-        secure=is_production,
+        secure=True,
         samesite='Lax',
         max_age=3600,
         path='/'
@@ -355,7 +357,8 @@ def api_verify_session():
         "success": True,
         "user": {
             "id": payload.get('user_id'),
-            "username": payload.get('username')
+            "username": payload.get('username'),
+            "role": payload.get('user_role')
         }
     }), 200
 
@@ -514,10 +517,10 @@ def api_register():
 
         # Insert new user
         insert_query = """
-            INSERT INTO user (user_name, user_email, password_hash, bio, is_private)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO user (user_name, user_email, password_hash, bio, is_private, user_role)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """
-        db_query.execute(insert_query, (username, email, password_hash, bio, private_value))
+        db_query.execute(insert_query, (username, email, password_hash, bio, private_value, 'normie'))
         connection.commit()
 
         # Get the newly created user
@@ -532,9 +535,11 @@ def api_register():
         ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '0.0.0.0').split(',')[0] or '0.0.0.0'
         user_agent = request.headers.get('User-Agent', '')
         
+        
         access_token, refresh_token, session_id = create_session(
             new_user['user_id'],
             new_user['user_name'],
+            new_user['user_role'],
             ip_address,
             user_agent
         )
@@ -552,7 +557,8 @@ def api_register():
             "user": {
                 "id": new_user['user_id'],
                 "username": new_user['user_name'],
-                "email": new_user.get('user_email', '')
+                "email": new_user.get('user_email', ''),
+                "role": new_user['user_role']
             }
         }))
 

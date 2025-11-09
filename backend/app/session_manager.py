@@ -22,7 +22,7 @@ REFRESH_TOKEN_EXPIRY = timedelta(days=7)  # Longer-lived refresh token
 SESSION_TOKEN_EXPIRY = timedelta(hours=24)  # Session token expiry
 
 
-def generate_session_token(user_id, username, ip_address, user_agent):
+def generate_session_token(user_id, username, user_role, ip_address, user_agent):
     """
     Generate a secure session token (JWT) with user info and security metadata.
     Includes protection against tampering via signature.
@@ -42,6 +42,7 @@ def generate_session_token(user_id, username, ip_address, user_agent):
     payload = {
         'user_id': user_id,
         'username': username,
+        'user_role': user_role,
         'session_id': session_id,
         'fingerprint': fingerprint,
         'ip_address': ip_address,
@@ -54,9 +55,10 @@ def generate_session_token(user_id, username, ip_address, user_agent):
     return token, session_id
 
 
-def generate_refresh_token(user_id, session_id):
+def generate_refresh_token(user_id, session_id, username, user_role):
     """
     Generate a refresh token for obtaining new access tokens.
+    Includes user_role and username to preserve session state without database lookup.
     """
     now = datetime.utcnow()
     iat = int(now.timestamp())
@@ -65,6 +67,8 @@ def generate_refresh_token(user_id, session_id):
     payload = {
         'user_id': user_id,
         'session_id': session_id,
+        'username': username,
+        'user_role': user_role,
         'iat': iat,
         'exp': exp,
         'type': 'refresh_token'
@@ -143,7 +147,7 @@ def verify_refresh_token(token):
         return False, None, f"Invalid refresh token: {str(e)}"
 
 
-def create_session(user_id, username, ip_address, user_agent):
+def create_session(user_id, username, user_role, ip_address, user_agent):
     """
     Create a new session in the database and return tokens.
     """
@@ -163,8 +167,8 @@ def create_session(user_id, username, ip_address, user_agent):
         db_query = connection.cursor(dictionary=True)
         
         # Generate tokens
-        access_token, session_id = generate_session_token(user_id, username, ip_address, user_agent)
-        refresh_token = generate_refresh_token(user_id, session_id)
+        access_token, session_id = generate_session_token(user_id, username, user_role, ip_address, user_agent)
+        refresh_token = generate_refresh_token(user_id, session_id, username, user_role)
         
         # Store session in database
         now = datetime.utcnow()
@@ -285,13 +289,17 @@ def is_session_valid(session_id, user_id):
 def refresh_access_token(refresh_token):
     """
     Generate a new access token from a valid refresh token.
+    Uses user_role and username from the refresh token payload to preserve session state.
     """
     is_valid, payload, error = verify_refresh_token(refresh_token)
     if not is_valid:
         return None, None, error
     
+    # Get user info from refresh token payload (preserves session state)
     user_id = payload.get('user_id')
     session_id = payload.get('session_id')
+    username = payload.get('username')
+    user_role = payload.get('user_role')
     
     # Get user info from database
     connection = get_db_connection()
@@ -313,7 +321,7 @@ def refresh_access_token(refresh_token):
         user_agent = request.headers.get('User-Agent', '')
         
         # Generate new access token
-        access_token, _ = generate_session_token(user_id, user['user_name'], ip_address, user_agent)
+        access_token, _ = generate_session_token(user_id, user['user_name'], user_role, ip_address, user_agent)
         
         return access_token, None, None
         

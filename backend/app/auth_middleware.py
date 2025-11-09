@@ -54,6 +54,7 @@ def require_auth(f):
         # Add user info to request context
         request.user_id = payload.get('user_id')
         request.username = payload.get('username')
+        request.user_role = payload.get('user_role', 'admin')
         request.session_id = payload.get('session_id')
         
         return f(*args, **kwargs)
@@ -75,15 +76,18 @@ def optional_auth(f):
             if is_valid:
                 request.user_id = payload.get('user_id')
                 request.username = payload.get('username')
+                request.user_role = payload.get('user_role', 'normie')
                 request.session_id = payload.get('session_id')
             else:
                 # Token invalid but route allows unauthenticated access
                 request.user_id = None
                 request.username = None
+                request.user_role = None
                 request.session_id = None
         else:
             request.user_id = None
             request.username = None
+            request.user_role = None
             request.session_id = None
         
         return f(*args, **kwargs)
@@ -96,15 +100,13 @@ def set_auth_cookies(response, access_token, refresh_token):
     Set secure authentication cookies in the response.
     Uses HttpOnly, Secure, and SameSite attributes for security.
     """
-    # Determine if we're in production (HTTPS)
-    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('ENVIRONMENT') == 'production'
     
     # Set access token cookie (short-lived)
     response.set_cookie(
         'access_token',
         access_token,
         httponly=True,  # Prevents JavaScript access (XSS protection)
-        secure=is_production,  # Only send over HTTPS in production
+        secure=True,  # Only send over HTTPS in production
         samesite='Lax',  # CSRF protection
         max_age=3600,  # 1 hour
         path='/'
@@ -115,7 +117,7 @@ def set_auth_cookies(response, access_token, refresh_token):
         'refresh_token',
         refresh_token,
         httponly=True,
-        secure=is_production,
+        secure=True,
         samesite='Lax',
         max_age=604800,  # 7 days
         path='/'
