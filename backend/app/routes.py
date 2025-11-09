@@ -12,9 +12,9 @@ from app.two_factor import initiate_2fa, verify_2fa_code
 
 
 @app.route('/')
-# @app.route('/index')
-# def index():
-#     return "Hello, World!"
+@app.route('/index')
+def index():
+    return "Hello, World!"
 
 @app.route('/api/health', methods=['GET'])
 def api_health():
@@ -571,7 +571,7 @@ def api_register():
             "message": "An error occurred during registration."
         }), 500
 
-@app.route("/api-tester", methods=['GET', 'POST']) # remove after testing
+@app.route("/api-tester") # remove after testing
 def api_tester():
     return render_template("tester_api.html")
 
