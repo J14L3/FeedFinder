@@ -12,9 +12,9 @@ from app.two_factor import initiate_2fa, verify_2fa_code
 
 
 @app.route('/')
-@app.route('/index')
-def index():
-    return "Hello, World!"
+# @app.route('/index')
+# def index():
+#     return "Hello, World!"
 
 @app.route('/api/health', methods=['GET'])
 def api_health():
