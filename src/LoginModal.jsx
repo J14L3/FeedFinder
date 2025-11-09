@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, LogIn, User, Lock } from 'lucide-react';
 import { login } from './authService';
+import { API_BASE } from "./config";
 
 const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -58,7 +59,7 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
     setIsLoading(true);
     setMessage("");
     try {
-      const res = await fetch("/api/verify-2fa", {
+      const res = await fetch(`${API_BASE}/api/verify-2fa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_token: sessionToken, code: twoFACode }),
