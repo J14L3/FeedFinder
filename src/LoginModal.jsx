@@ -7,6 +7,7 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     // Fetch CSRF token on component mount
@@ -15,13 +16,51 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
     });
   }, []);
 
+  const validateForm = () => {
+    const newErrors = {};
+    const trimmedUsername = form.username.trim();
+    const trimmedPassword = form.password.trim();
+
+    // Username validation
+    if (!trimmedUsername) {
+      newErrors.username = "Username is required";
+    } else if (trimmedUsername.length < 3) {
+      newErrors.username = "Username must be at least 3 characters long";
+    } else if (trimmedUsername.length > 50) {
+      newErrors.username = "Username must be less than 50 characters";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      newErrors.username = "Username can only contain letters, numbers, and underscores";
+    }
+
+    // Password validation
+    if (!trimmedPassword) {
+      newErrors.password = "Password is required";
+    } else if (trimmedPassword.length < 8) {
+      newErrors.password = "Password must be at least 8 characters long";
+    } else if (trimmedPassword.length > 128) {
+      newErrors.password = "Password must be less than 128 characters";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
+    setErrors({});
+    
+    if (!validateForm()) {
+      setIsLoading(false);
+      return;
+    }
+
+    const trimmedUsername = form.username.trim();
+    const trimmedPassword = form.password.trim();
     
     try {
-      const { success, data } = await login(form.username, form.password);
+      const { success, data } = await login(trimmedUsername, trimmedPassword);
       
       if (success) {
         setMessage(data.message || "Login successful!");
@@ -93,13 +132,23 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
                 <input
                   type="text"
                   placeholder="Enter your username"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.username ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, username: e.target.value });
+                    if (errors.username) {
+                      setErrors({ ...errors, username: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={50}
                 />
               </div>
+              {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
             </div>
 
             {/* Password Field */}
@@ -114,13 +163,23 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
                 <input
                   type="password"
                   placeholder="Enter your password"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.password ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, password: e.target.value });
+                    if (errors.password) {
+                      setErrors({ ...errors, password: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={128}
                 />
               </div>
+              {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
             </div>
 
             {/* Submit Button */}

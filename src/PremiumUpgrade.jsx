@@ -8,6 +8,7 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
   const [cvv, setCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const formatCardNumber = (value) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -44,33 +45,120 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
 
   const handleCvvChange = (e) => {
     const v = e.target.value.replace(/\D/g, '');
-    if (v.length <= 3) {
+    if (v.length <= 4) {
       setCvv(v);
     }
   };
 
-  const validateForm = () => {
-    if (!cardNumber || cardNumber.replace(/\s/g, '').length < 16) {
-      alert('Please enter a valid card number.');
+  // Luhn algorithm for card number validation
+  const validateCardNumber = (cardNumber) => {
+    const cleaned = cardNumber.replace(/\s/g, '');
+    if (cleaned.length < 13 || cleaned.length > 19) {
       return false;
     }
-    if (!cardName.trim()) {
-      alert('Please enter the cardholder name.');
+
+    let sum = 0;
+    let isEven = false;
+
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      let digit = parseInt(cleaned.charAt(i), 10);
+
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) {
+          digit -= 9;
+        }
+      }
+
+      sum += digit;
+      isEven = !isEven;
+    }
+
+    return sum % 10 === 0;
+  };
+
+  const validateExpiryDate = (expiry) => {
+    if (!expiry || expiry.length !== 5) {
       return false;
     }
-    if (!expiryDate || expiryDate.length < 5) {
-      alert('Please enter a valid expiry date (MM/YY).');
+
+    const [month, year] = expiry.split('/');
+    const monthNum = parseInt(month, 10);
+    const yearNum = parseInt('20' + year, 10);
+
+    if (monthNum < 1 || monthNum > 12) {
       return false;
     }
-    if (!cvv || cvv.length < 3) {
-      alert('Please enter a valid CVV.');
+
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+    const expiryDate = new Date(yearNum, monthNum - 1);
+
+    if (yearNum < currentYear) {
       return false;
     }
+
+    if (yearNum === currentYear && monthNum < currentMonth) {
+      return false;
+    }
+
     return true;
+  };
+
+  const validateCardName = (name) => {
+    if (!name || name.trim().length < 2) {
+      return false;
+    }
+    // Cardholder name should only contain letters, spaces, hyphens, and apostrophes
+    return /^[a-zA-Z\s'-]+$/.test(name.trim());
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    const cleanedCardNumber = cardNumber.replace(/\s/g, '');
+
+    // Card number validation
+    if (!cardNumber || cleanedCardNumber.length < 13) {
+      newErrors.cardNumber = 'Please enter a valid card number';
+    } else if (cleanedCardNumber.length > 19) {
+      newErrors.cardNumber = 'Card number is too long';
+    } else if (!validateCardNumber(cardNumber)) {
+      newErrors.cardNumber = 'Card number is invalid';
+    }
+
+    // Cardholder name validation
+    if (!cardName.trim()) {
+      newErrors.cardName = 'Please enter the cardholder name';
+    } else if (!validateCardName(cardName)) {
+      newErrors.cardName = 'Cardholder name can only contain letters, spaces, hyphens, and apostrophes';
+    } else if (cardName.trim().length > 50) {
+      newErrors.cardName = 'Cardholder name is too long';
+    }
+
+    // Expiry date validation
+    if (!expiryDate || expiryDate.length < 5) {
+      newErrors.expiryDate = 'Please enter a valid expiry date (MM/YY)';
+    } else if (!validateExpiryDate(expiryDate)) {
+      newErrors.expiryDate = 'Expiry date is invalid or expired';
+    }
+
+    // CVV validation
+    if (!cvv || cvv.length < 3) {
+      newErrors.cvv = 'Please enter a valid CVV';
+    } else if (cvv.length > 4) {
+      newErrors.cvv = 'CVV must be 3 or 4 digits';
+    } else if (!/^\d+$/.test(cvv)) {
+      newErrors.cvv = 'CVV must contain only numbers';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({});
     
     if (!validateForm()) {
       return;
@@ -184,13 +272,24 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
                   <input
                     type="text"
                     value={cardNumber}
-                    onChange={handleCardNumberChange}
+                    onChange={(e) => {
+                      handleCardNumberChange(e);
+                      if (errors.cardNumber) {
+                        setErrors({ ...errors, cardNumber: '' });
+                      }
+                    }}
+                    onBlur={validateForm}
                     placeholder="1234 5678 9012 3456"
                     maxLength={19}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                      errors.cardNumber ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
                 </div>
+                {errors.cardNumber && (
+                  <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>
+                )}
               </div>
 
               {/* Cardholder Name */}
@@ -201,12 +300,24 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
                 <input
                   type="text"
                   value={cardName}
-                  onChange={(e) => setCardName(e.target.value)}
+                  onChange={(e) => {
+                    setCardName(e.target.value);
+                    if (errors.cardName) {
+                      setErrors({ ...errors, cardName: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   placeholder="John Doe"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                    errors.cardName ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   required
+                  maxLength={50}
                 />
               </div>
+              {errors.cardName && (
+                <p className="text-red-500 text-sm mt-1">{errors.cardName}</p>
+              )}
 
               {/* Expiry and CVV */}
               <div className="grid grid-cols-2 gap-4">
@@ -217,12 +328,23 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
                   <input
                     type="text"
                     value={expiryDate}
-                    onChange={handleExpiryChange}
+                    onChange={(e) => {
+                      handleExpiryChange(e);
+                      if (errors.expiryDate) {
+                        setErrors({ ...errors, expiryDate: '' });
+                      }
+                    }}
+                    onBlur={validateForm}
                     placeholder="MM/YY"
                     maxLength={5}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                      errors.expiryDate ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
+                  {errors.expiryDate && (
+                    <p className="text-red-500 text-sm mt-1">{errors.expiryDate}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,12 +353,23 @@ const PremiumUpgrade = ({ setIsPremium, setActiveTab }) => {
                   <input
                     type="text"
                     value={cvv}
-                    onChange={handleCvvChange}
+                    onChange={(e) => {
+                      handleCvvChange(e);
+                      if (errors.cvv) {
+                        setErrors({ ...errors, cvv: '' });
+                      }
+                    }}
+                    onBlur={validateForm}
                     placeholder="123"
-                    maxLength={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    maxLength={4}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                      errors.cvv ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     required
                   />
+                  {errors.cvv && (
+                    <p className="text-red-500 text-sm mt-1">{errors.cvv}</p>
+                  )}
                 </div>
               </div>
 

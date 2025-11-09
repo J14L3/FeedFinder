@@ -44,7 +44,7 @@ app.config.update(
     MAIL_USE_TLS=os.getenv('MAIL_USE_TLS') == 'True',
     MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
     MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
-    SECRET_KEY=os.getenv('SECRET_KEY') or os.environ.get('SECRET_KEY') or 'AlphaThreeForty',
+    SECRET_KEY=os.getenv('SECRET_KEY') or os.environ.get('SECRET_KEY'),
     BASE_URL=os.getenv('BASE_URL'),
     # Session configuration for security
     SESSION_COOKIE_HTTPONLY=True,

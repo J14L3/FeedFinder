@@ -60,35 +60,73 @@ const SettingsPage = () => {
     loadProfile();
   }, []);
 
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
-  const handleSave = async () => {
-    // Validate email
-    if (!email.trim()) {
-      setSaveStatus('error');
-      setErrorMessage('Email is required.');
-      return;
+  const validateProfilePicture = (url) => {
+    if (!url || url.trim() === '') {
+      return 'Profile picture URL is required';
+    }
+    try {
+      new URL(url);
+      return null;
+    } catch {
+      return 'Please enter a valid URL';
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    const trimmedEmail = email.trim();
+    const trimmedBio = bio.trim();
+
+    // Email validation
+    if (!trimmedEmail) {
+      newErrors.email = 'Email is required';
+    } else if (!validateEmail(trimmedEmail)) {
+      newErrors.email = 'Please enter a valid email address';
+    } else if (trimmedEmail.length > 255) {
+      newErrors.email = 'Email must be less than 255 characters';
     }
 
-    if (!validateEmail(email)) {
+    // Bio validation
+    if (trimmedBio.length > 500) {
+      newErrors.bio = 'Bio must be less than 500 characters';
+    }
+
+    // Profile picture validation
+    const pictureError = validateProfilePicture(profilePicture);
+    if (pictureError) {
+      newErrors.profilePicture = pictureError;
+    }
+
+    setFieldErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    setFieldErrors({});
+    setSaveStatus(null);
+    setErrorMessage('');
+
+    if (!validateForm()) {
       setSaveStatus('error');
-      setErrorMessage('Please enter a valid email address.');
+      setErrorMessage('Please fix the errors before saving.');
       return;
     }
 
     setIsSaving(true);
-    setSaveStatus(null);
-    setErrorMessage('');
 
     try {
       // Prepare update data (only send fields that have changed)
       const updateData = {
         user_email: email.trim(),
         bio: bio.trim(),
-        profile_picture: profilePicture
+        profile_picture: profilePicture.trim()
       };
 
       const result = await updateProfile(updateData);
@@ -217,11 +255,23 @@ const SettingsPage = () => {
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (fieldErrors.email) {
+                  setFieldErrors({ ...fieldErrors, email: '' });
+                }
+              }}
+              onBlur={validateForm}
               placeholder="Enter your email address"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
+                fieldErrors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
+              maxLength={255}
             />
           </div>
+          {fieldErrors.email && (
+            <p className="text-red-500 text-sm mt-1">{fieldErrors.email}</p>
+          )}
           <p className="text-xs text-gray-500 mt-2">
             We'll use this email to send you important updates and notifications.
           </p>
@@ -237,18 +287,33 @@ const SettingsPage = () => {
             <textarea
               id="bio"
               value={bio}
-              onChange={(e) => setBio(e.target.value)}
+              onChange={(e) => {
+                const newBio = e.target.value;
+                if (newBio.length <= 500) {
+                  setBio(newBio);
+                  if (fieldErrors.bio) {
+                    setFieldErrors({ ...fieldErrors, bio: '' });
+                  }
+                }
+              }}
+              onBlur={validateForm}
               placeholder="Tell us about yourself..."
               rows={5}
               maxLength={500}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none ${
+                fieldErrors.bio ? 'border-red-500' : 'border-gray-300'
+              }`}
             />
           </div>
           <div className="flex items-center justify-between mt-2">
-            <p className="text-xs text-gray-500">
-              Share a brief description about yourself with other users.
-            </p>
-            <p className="text-xs text-gray-400">
+            {fieldErrors.bio ? (
+              <p className="text-red-500 text-sm">{fieldErrors.bio}</p>
+            ) : (
+              <p className="text-xs text-gray-500">
+                Share a brief description about yourself with other users.
+              </p>
+            )}
+            <p className={`text-xs ml-auto ${bio.length > 450 ? 'text-orange-500' : 'text-gray-400'}`}>
               {bio.length}/500 characters
             </p>
           </div>

@@ -17,6 +17,7 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     // Fetch CSRF token on component mount
@@ -25,21 +26,96 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
     });
   }, []);
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    // At least 8 characters, can contain letters, numbers, and special characters
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long";
+    }
+    if (password.length > 128) {
+      return "Password must be less than 128 characters";
+    }
+    return null;
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    const trimmedUsername = form.username.trim();
+    const trimmedEmail = form.email.trim();
+    const trimmedPassword = form.password.trim();
+    const trimmedConfirmPassword = form.confirm_password.trim();
+    const trimmedBio = form.bio.trim();
+
+    // Username validation
+    if (!trimmedUsername) {
+      newErrors.username = "Username is required";
+    } else if (trimmedUsername.length < 3) {
+      newErrors.username = "Username must be at least 3 characters long";
+    } else if (trimmedUsername.length > 50) {
+      newErrors.username = "Username must be less than 50 characters";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      newErrors.username = "Username can only contain letters, numbers, and underscores";
+    }
+
+    // Email validation
+    if (!trimmedEmail) {
+      newErrors.email = "Email is required";
+    } else if (!validateEmail(trimmedEmail)) {
+      newErrors.email = "Please enter a valid email address";
+    } else if (trimmedEmail.length > 255) {
+      newErrors.email = "Email must be less than 255 characters";
+    }
+
+    // Password validation
+    const passwordError = validatePassword(trimmedPassword);
+    if (!trimmedPassword) {
+      newErrors.password = "Password is required";
+    } else if (passwordError) {
+      newErrors.password = passwordError;
+    }
+
+    // Confirm password validation
+    if (!trimmedConfirmPassword) {
+      newErrors.confirm_password = "Please confirm your password";
+    } else if (trimmedPassword !== trimmedConfirmPassword) {
+      newErrors.confirm_password = "Passwords do not match";
+    }
+
+    // Bio validation
+    if (trimmedBio && trimmedBio.length > 500) {
+      newErrors.bio = "Bio must be less than 500 characters";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
+    setErrors({});
 
-    // Validate passwords match
-    if (form.password !== form.confirm_password) {
-      setMessage("Passwords do not match!");
-      setIsError(true);
+    if (!validateForm()) {
       setIsLoading(false);
       return;
     }
 
+    const trimmedForm = {
+      username: form.username.trim(),
+      email: form.email.trim(),
+      password: form.password.trim(),
+      confirm_password: form.confirm_password.trim(),
+      bio: form.bio.trim(),
+      private: form.private,
+    };
+
     try {
-      const { success, data } = await register(form);
+      const { success, data } = await register(trimmedForm);
 
       if (success) {
         setMessage(data.message || "Account created successfully!");
@@ -126,13 +202,23 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                 <input
                   type="text"
                   placeholder="Choose a username"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.username ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, username: e.target.value });
+                    if (errors.username) {
+                      setErrors({ ...errors, username: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={50}
                 />
               </div>
+              {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
             </div>
 
             {/* Email Field */}
@@ -147,13 +233,23 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.email ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, email: e.target.value });
+                    if (errors.email) {
+                      setErrors({ ...errors, email: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={255}
                 />
               </div>
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
             </div>
 
             {/* Password Field */}
@@ -168,11 +264,24 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
-                  className="w-full pl-10 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.password ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) => {
+                    setForm({ ...form, password: e.target.value });
+                    if (errors.password) {
+                      setErrors({ ...errors, password: '' });
+                    }
+                    // Clear confirm password error if passwords now match
+                    if (errors.confirm_password && e.target.value === form.confirm_password) {
+                      setErrors({ ...errors, confirm_password: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={128}
                 />
                 <button
                   type="button"
@@ -186,6 +295,7 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                   )}
                 </button>
               </div>
+              {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
             </div>
 
             {/* Confirm Password Field */}
@@ -200,13 +310,20 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
-                  className="w-full pl-10 pr-12 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                  className={`w-full pl-10 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
+                    errors.confirm_password ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.confirm_password}
-                  onChange={(e) =>
-                    setForm({ ...form, confirm_password: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setForm({ ...form, confirm_password: e.target.value });
+                    if (errors.confirm_password) {
+                      setErrors({ ...errors, confirm_password: '' });
+                    }
+                  }}
+                  onBlur={validateForm}
                   required
                   disabled={isLoading}
+                  maxLength={128}
                 />
                 <button
                   type="button"
@@ -220,6 +337,7 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                   )}
                 </button>
               </div>
+              {errors.confirm_password && <p className="text-red-500 text-sm mt-1">{errors.confirm_password}</p>}
             </div>
 
             {/* Bio Field */}
@@ -233,11 +351,29 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
                 </div>
                 <textarea
                   placeholder="Tell us about yourself..."
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white resize-none h-24"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white resize-none h-24 ${
+                    errors.bio ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   value={form.bio}
-                  onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                  onChange={(e) => {
+                    const newBio = e.target.value;
+                    if (newBio.length <= 500) {
+                      setForm({ ...form, bio: newBio });
+                      if (errors.bio) {
+                        setErrors({ ...errors, bio: '' });
+                      }
+                    }
+                  }}
+                  onBlur={validateForm}
                   disabled={isLoading}
+                  maxLength={500}
                 />
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                {errors.bio && <p className="text-red-500 text-sm">{errors.bio}</p>}
+                <p className={`text-xs ml-auto ${form.bio.length > 450 ? 'text-orange-500' : 'text-gray-400'}`}>
+                  {form.bio.length}/500 characters
+                </p>
               </div>
             </div>
 
