@@ -44,7 +44,7 @@ def login():
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 20 characters (letters, numbers, underscores only).", "danger")
             return render_template('login.html')
 
         if len(username) > 50 or len(password) > 100:
@@ -441,19 +441,23 @@ def register():
             flash("Passwords do not match!", "danger")
             return render_template('register.html')
         
+        # Validate password length
+        if len(password) < 8:
+            flash("Password must be at least 8 characters long.", "danger")
+            return render_template('register.html')
 
         # Validate format and length of inputs
         USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
 
         if not USERNAME_RE.match(username):
-            flash("Username must be 3â€“20 characters (letters, numbers, underscores only).", "danger")
+            flash("Username must be 20 characters (letters, numbers, underscores only).", "danger")
             return render_template('register.html')
 
         if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
             flash("Invalid email format.", "danger")
             return render_template('register.html')
         
-        if len(username) > 50 or len(email) > 100 or len(password) > 100:
+        if len(username) > 50 or len(email) > 255 or len(password) > 128:
             flash("Input too long.", "danger")
             return render_template('register.html')
         
@@ -532,6 +536,13 @@ def api_register():
             "message": "Passwords do not match!"
         }), 400
 
+    # Validate password length
+    if len(password) < 8:
+        return jsonify({
+            "success": False,
+            "message": "Password must be at least 8 characters long."
+        }), 400
+
     # Validate username and email format
     USERNAME_RE = re.compile(r'^[A-Za-z0-9_]{3,20}$')
     if not USERNAME_RE.match(username):
@@ -547,7 +558,7 @@ def api_register():
         }), 400
 
     # Length checks
-    if len(username) > 50 or len(email) > 100 or len(password) > 100:
+    if len(username) > 50 or len(email) > 255 or len(password) > 128:
         return jsonify({
             "success": False,
             "message": "Input too long."
