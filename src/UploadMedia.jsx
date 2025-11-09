@@ -1,30 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Image, Video, File, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { API_BASE } from './config'; 
-import { verifySession } from "./authService";
 
-const UploadMedia = () => { 
-  const [currUserId, setCurrUserId] = useState(null); // receive the current user ID from main page
+const UploadMedia = ({ currUserId }) => { // receive the current user ID from main page
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [postDescription, setPostDescription] = useState('');
   const fileInputRef = useRef(null);
-
-  // get logged in user user ID
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await verifySession();
-        if (user) {
-          setCurrUserId(user.id);
-          console.log("Current logged-in user ID:", user.id);
-        }
-      } catch (err) {
-        console.error("Failed to get user ID:", err);
-      }
-    };
-    fetchUser();
-  }, []);
 
   // Accepted file types
   const acceptedTypes = {
