@@ -153,39 +153,3 @@ cd backend && pytest tests/ -v
 ```bash
 npm test -- --run
 ```
-
-## Test Best Practices
-
-1. **Unit Tests**: Test individual functions and components in isolation
-2. **Integration Tests**: Test API endpoints and component interactions
-3. **Mock External Dependencies**: Use mocks for database, API calls, etc.
-4. **Test Edge Cases**: Include tests for error conditions and boundary cases
-5. **Keep Tests Fast**: Tests should run quickly to enable frequent execution
-6. **Clear Test Names**: Use descriptive test names that explain what is being tested
-
-## Troubleshooting
-
-### Backend Tests
-
-- **Import Errors**: Make sure you're running tests from the backend directory
-- **Database Connection**: Tests use mocks, so no database connection is needed
-- **Module Not Found**: Ensure all dependencies are installed: `pip install -r requirements.txt`
-
-### Frontend Tests
-
-- **Module Not Found**: Run `npm install` to install dependencies
-- **jsdom Errors**: Ensure `jsdom` is installed: `npm install -D jsdom`
-- **Environment Variables**: Tests use mocked environment variables in `src/test/setup.js`
-
-## Coverage Goals
-
-- **Backend**: Aim for >80% code coverage
-- **Frontend**: Aim for >70% code coverage for critical components
-
-## Next Steps
-
-1. Add more integration tests for API endpoints
-2. Add end-to-end tests using Playwright or Cypress
-3. Set up CI/CD pipeline to run tests automatically
-4. Add performance tests for critical paths
-
