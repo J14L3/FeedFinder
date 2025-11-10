@@ -204,6 +204,7 @@ const SearchResultsPage = ({ searchQuery, onBack, isLoggedIn, isPremium, current
               <PostCards
                 key={post.id}
                 post={post}
+                currentUserId={currentUserId} 
                 setShowRatingModal={setShowRatingModal}
                 isLoggedIn={isLoggedIn}
                 isPremium={isPremium}

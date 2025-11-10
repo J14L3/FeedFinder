@@ -153,13 +153,21 @@ const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = f
         <p className="text-gray-800 mb-3">{post.caption}</p>
         <div className="flex items-center justify-end pt-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <button
+            {/* <button
               onClick={() => !isOwnPost && setShowRatingModal(post)}
               disabled={!isLoggedIn || isOwnPost}
               className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-full font-medium transition flex items-center gap-1"
             >
               <Star size={16} /> Rate
-            </button>
+            </button> */}
+             {isLoggedIn && !isOwnPost && (
+              <button
+                onClick={() => setShowRatingModal(post)}
+                className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-full font-medium transition flex items-center gap-1"
+              >
+                <Star size={16} /> Rate
+              </button>
+            )}
           </div>
         </div>
       </div>
