@@ -303,8 +303,7 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {/* Only show Admin Panel if user role is exactly 'admin' */}
-                    {userRole && userRole.toLowerCase() === 'admin' ? (
+                    {userRole && userRole.toLowerCase() === 'admin' && (
                       <button
                         onClick={() => {
                           setActiveTab('admin');
@@ -315,7 +314,7 @@ const FeedFinder = () => {
                         <Shield size={18} />
                         Admin Panel
                       </button>
-                    ) : null}
+                    )}
                     {/* {!isPremium && (
                       <button
                         onClick={() => {
