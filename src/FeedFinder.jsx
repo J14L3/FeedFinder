@@ -303,7 +303,7 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {userRole && userRole.toLowerCase() === 'admin' && (
+                    {userRole && String(userRole).trim().toLowerCase() === 'admin' && (
                       <button
                         onClick={() => {
                           setActiveTab('admin');
