@@ -23,6 +23,12 @@ const imagesByName = Object.fromEntries(
   Object.entries(imageUrls).map(([path, url]) => [path.split('/').pop(), url])
 );
 
+const inferMediaType = (url = "") => {
+  const ext = url.split(".").pop()?.toLowerCase() || "";
+  if (["mp4","mov","webm"].includes(ext)) return "video";
+  return "image";
+};
+
 const FeedFinder = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -120,7 +126,7 @@ const FeedFinder = () => {
                verified: false,
                isPremium: false
              },
-             type: p.media_url ? 'image' : 'text',
+             type: p.media_type || (p.media_url ? inferMediaType(p.media_url) : 'image'),
              content: p.media_url || '',
              caption: p.content_text || '',
              timestamp: p.created_at ? formatTimestamp(p.created_at) : 'Just now',
@@ -141,106 +147,6 @@ const FeedFinder = () => {
       fetchPosts();
     }
   }, [isCheckingAuth, isLoggedIn, activeTab]);
-
-  // Sample posts data
-  // const posts = [
-  // {
-  //   id: 1,
-  //   author: {
-  //     name: 'Lee Yong Zhang',
-  //     username: '@lyz',
-  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-  //     rating: 4.8,
-  //     verified: true,
-  //     isPremium: true
-  //   },
-  //   type: 'image',
-  //   content: imagesByName['yz.jpg'] || '',
-  //   caption: 'Look at my tattoo! Hit me up if you want some! 💙',
-  //   timestamp: '2h ago',
-  //   likes: 1247,
-  //   comments: 89,
-  //   isExclusive: false
-  // },
-  // {
-  //   id: 2,
-  //   author: {
-  //     name: 'Mike Chen',
-  //     username: '@mikechen',
-  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-  //     rating: 4.5,
-  //     verified: false,
-  //     isPremium: false
-  //   },
-  //   type: 'video',
-  //   content: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&h=800&fit=crop',
-  //   caption: 'Behind the scenes of my latest video! Check out my exclusive content for more 🎬',
-  //   timestamp: '5h ago',
-  //   likes: 892,
-  //   comments: 45,
-  //   isExclusive: true
-  // },
-  // {
-  //   id: 3,
-  //   author: {
-  //     name: 'Emma Williams',
-  //     username: '@emmaw',
-  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emma',
-  //     rating: 4.9,
-  //     verified: true,
-  //     isPremium: true
-  //   },
-  //   type: 'image',
-  //   content: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&h=800&fit=crop',
-  //   caption: 'Feeling grateful for all the support! Your donations help me create better content 🙏',
-  //   timestamp: '8h ago',
-  //   likes: 2103,
-  //   comments: 156,
-  //   isExclusive: false
-  // },
-  // {
-  //   id: 4,
-  //   author: {
-  //     name: 'David Martinez',
-  //     username: '@davidm',
-  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
-  //     rating: 4.2,
-  //     verified: false,
-  //     isPremium: false
-  //   },
-  //   type: 'text',
-  //   content: '',
-  //   caption: 'Just want to share my thoughts on building meaningful connections in the digital age. Sometimes the best conversations happen when we take the time to truly understand each other. What are your thoughts?',
-  //   timestamp: '12h ago',
-  //   likes: 456,
-  //   comments: 78,
-  //   isExclusive: false
-  // },
-  // {
-  //   id: 5,
-  //   author: {
-  //     name: 'Lisa Anderson',
-  //     username: '@lisaa',
-  //     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-  //     rating: 4.7,
-  //     verified: true,
-  //     isPremium: true
-  //   },
-  //   type: 'image',
-  //   content: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=800&h=800&fit=crop',
-  //   caption: 'New exclusive content dropping this week! Premium members get early access ✨',
-  //   timestamp: '1d ago',
-  //   likes: 1789,
-  //   comments: 234,
-  //   isExclusive: true
-  // }
-  // ];
-
-  // const filteredPosts = posts.filter(post => 
-  //   post.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  //   post.author.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  //   post.caption.toLowerCase().includes(searchQuery.toLowerCase())
-  // );
 
   const filteredPosts = posts.filter(post =>
     post.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -437,7 +343,7 @@ const FeedFinder = () => {
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-6">
         {activeTab === 'upload' ? (
-          <UploadMedia currUserId={currentUserId}/>
+          <UploadMedia />
         ) : activeTab === 'settings' ? (
           <SettingsPage />
         ) : activeTab === 'premium' ? (

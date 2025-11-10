@@ -1,12 +1,29 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image, Video, File, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
-import { API_BASE } from './config'; 
+import { API_BASE } from './config';
 
-const UploadMedia = ({ currUserId }) => { // receive the current user ID from main page
+const UploadMedia = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [postDescription, setPostDescription] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
+  const [currUserId, setCurrUserId] = useState(null);
   const fileInputRef = useRef(null);
+
+  // get userid
+  useEffect(() => {
+    (async () => {
+      try {
+        const { verifySession } = await import('./authService'); // <- dynamic import
+        const user = await verifySession();
+        if (user) {
+          setCurrUserId(user.id);
+        }
+      } catch (err) {
+        console.error('Failed to get user ID:', err);
+      }
+    })();
+  }, []);
 
   // Accepted file types
   const acceptedTypes = {
@@ -111,53 +128,21 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
     }
   };
 
-  // const handleUpload = async () => {
-  //   if (!uploadedFile && postDescription.trim().length === 0) {
-  //     alert('Please add a file or a description to create a post.');
-  //     return;
-  //   }
-
-  //   // Simulate upload process
-  //   setUploadedFile(prev => {
-  //     if (prev) {
-  //       return { ...prev, status: 'uploading' };
-  //     }
-  //     return prev;
-  //   });
-
-  //   // Simulate API call
-  //   setTimeout(() => {
-  //     setUploadedFile(prev => {
-  //       if (prev) {
-  //         return { ...prev, status: 'success' };
-  //       }
-  //       return prev;
-  //     });
-  //     setTimeout(() => {
-  //       alert('Post created successfully!');
-  //       setUploadedFile(prev => {
-  //         if (prev?.preview) {
-  //           URL.revokeObjectURL(prev.preview);
-  //         }
-  //         return null;
-  //       });
-  //       setPostDescription('');
-  //       if (fileInputRef.current) {
-  //         fileInputRef.current.value = '';
-  //       }
-  //     }, 1000);
-  //   }, 2000);
-  // };
-
   const handleUpload = async () => {
+    if (!currUserId) {
+      alert("User not logged in — please log in first.");
+      return;
+    }
     if (!uploadedFile && postDescription.trim().length === 0) {
       alert("Please add a file or a description to create a post.");
       return;
     }
 
+    setIsPosting(true);                     // show loading
     try {
       // upload media file
       let mediaUrl = "";
+      let mediaType = "image"; 
       if (uploadedFile) {
         const formData = new FormData();
         formData.append("file", uploadedFile.file);
@@ -174,6 +159,10 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
         }
 
         mediaUrl = uploadData.media_url;
+        mediaType = uploadData.media_type ||
+      (/\.(mp4|webm|mov|ogg)$/i.test(mediaUrl) ? "video" :
+       /\.(png|jpe?g|gif|webp|avif)$/i.test(mediaUrl) ? "image" : "image");
+
       }
 
       // create post
@@ -184,22 +173,42 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
           user_id: currUserId,
           content_text: postDescription,
           media_url: mediaUrl,
+          media_type: mediaType,
           privacy: "public",
         }),
       });
 
-      const postData = await postRes.json();
-      if (postData.success || postRes.ok) {
-        alert("Post created successfully!");
-        setPostDescription("");
-        setUploadedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      } else {
-        alert(postData.message || "Failed to create post.");
+      //   const postData = await postRes.json();
+      //   if (postData.success || postRes.ok) {
+      //     alert("Post created successfully!");
+      //     setPostDescription("");
+      //     setUploadedFile(null);
+      //     if (fileInputRef.current) fileInputRef.current.value = "";
+      //   } else {
+      //     alert(postData.message || "Failed to create post.");
+      //   }
+      // } catch (err) {
+      //   console.error(err);
+      //   alert("An error occurred while uploading your post.");
+      // }
+
+      const postData = await postRes.json().catch(() => ({}));
+      if (!postRes.ok) {
+        throw new Error(postData?.message || "Failed to create post");
       }
+
+      alert("Post created successfully!");
+      // reset UI
+      setPostDescription("");
+      if (uploadedFile?.preview) URL.revokeObjectURL(uploadedFile.preview);
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       console.error(err);
-      alert("An error occurred while uploading your post.");
+      alert(err.message || "An error occurred while uploading your post.");
+
+    } finally {
+      setIsPosting(false);                  // hide loading
     }
   };
 
@@ -225,8 +234,8 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
         {/* Upload Area */}
         <div
           className={`border-2 border-dashed rounded-xl p-12 text-center mb-6 transition-all ${isDragging
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
             }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -344,7 +353,7 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
         </div>
 
         {/* Create Post Button */}
-        {(uploadedFile || postDescription.trim().length > 0) && (
+        {/* {(uploadedFile || postDescription.trim().length > 0) && (
           <div className="flex gap-4">
             <button
               onClick={handleUpload}
@@ -352,6 +361,33 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
               className="flex-1 bg-blue-500 text-white font-semibold py-4 rounded-xl hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {uploadedFile?.status === 'uploading' ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Creating Post...
+                </>
+              ) : (
+                <>
+                  <Upload size={20} />
+                  Create Post
+                </>
+              )}
+            </button>
+          </div>
+        )} */}
+
+        {/* Create Post Button */}
+        {(uploadedFile || postDescription.trim().length > 0) && (
+          <div className="flex gap-4">
+            <button
+              onClick={handleUpload}
+              disabled={
+                isPosting ||
+                uploadedFile?.status === 'uploading' ||
+                (!uploadedFile && postDescription.trim().length === 0)
+              }
+              className="flex-1 bg-blue-500 text-white font-semibold py-4 rounded-xl hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isPosting ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   Creating Post...
