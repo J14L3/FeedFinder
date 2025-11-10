@@ -2,12 +2,26 @@ import React, { useState, useRef } from 'react';
 import { Upload, X, Image, Video, File, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { API_BASE } from './config';
 
-const UploadMedia = ({ currUserId }) => { // receive the current user ID from main page
+const UploadMedia = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [postDescription, setPostDescription] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [currUserId, setCurrUserId] = useState(null); 
   const fileInputRef = useRef(null);
+
+  //get userid
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await verifySession();
+        if (user) setCurrUserId(user.id);
+      } catch (err) {
+        console.error("Failed to get user ID:", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // Accepted file types
   const acceptedTypes = {
@@ -113,6 +127,10 @@ const UploadMedia = ({ currUserId }) => { // receive the current user ID from ma
   };
 
   const handleUpload = async () => {
+    if (!currUserId) {
+      alert("User not logged in — please log in first.");
+      return;
+    }
     if (!uploadedFile && postDescription.trim().length === 0) {
       alert("Please add a file or a description to create a post.");
       return;

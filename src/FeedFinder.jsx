@@ -336,9 +336,7 @@ const FeedFinder = () => {
 
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-6">
-        {activeTab === 'upload' ? (
-          <UploadMedia currUserId={currentUserId}/>
-        ) : activeTab === 'settings' ? (
+        {activeTab === 'settings' ? (
           <SettingsPage />
         ) : activeTab === 'premium' ? (
           <PremiumUpgrade setIsPremium={setIsPremium} setActiveTab={setActiveTab} />
