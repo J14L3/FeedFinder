@@ -15,9 +15,13 @@ export const isSafeVideoUrl = (url = "") =>
   isRelativeOrTrusted(url) &&
   /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
 
-const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
+const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick, currentUserId }) => {
   const [avgRating, setAvgRating] = useState(null);
   const [ratingCount, setRatingCount] = useState(null);
+  //checks if is own post
+  const isOwnPost = Boolean(currentUserId) && (
+    post?.author?.id === currentUserId || post?.author?.user_id === currentUserId
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -150,7 +154,8 @@ const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = f
         <div className="flex items-center justify-end pt-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => isLoggedIn ? setShowRatingModal(post) : window.alert('Please login to rate profiles')}
+              onClick={() => !isOwnPost && setShowRatingModal(post)}
+              disabled={!isLoggedIn || isOwnPost}
               className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-full font-medium transition flex items-center gap-1"
             >
               <Star size={16} /> Rate

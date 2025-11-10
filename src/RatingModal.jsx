@@ -62,8 +62,6 @@ const RatingModal = ({ post, setShowRatingModal, currentUserId }) => {
             <div>
               <p className="font-semibold">{post.author.name}</p>
               <div className="flex items-center gap-1">
-                <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                <span className="text-sm font-medium">{post.author.rating}</span>
               </div>
             </div>
           </div>
@@ -84,10 +82,6 @@ const RatingModal = ({ post, setShowRatingModal, currentUserId }) => {
             </div>
             {rating > 0 && <p className="text-lg font-semibold text-gray-700">{getRatingText(rating)}</p>}
           </div>
-
-          {/* <button disabled={rating === 0} className="w-full bg-yellow-400 text-gray-900 font-semibold py-4 rounded-xl hover:bg-yellow-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-            <Star size={20} /> Submit Rating
-          </button> */}
           <button
             onClick={handleSubmit}
             disabled={submitting || rating === 0}
