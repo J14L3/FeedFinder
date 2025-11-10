@@ -397,7 +397,7 @@ def api_csrf_token():
 def api_verify_session():
     """
     Verify if current session is valid.
-    Returns user information.
+    Returns user information with role fetched from database.
     """
     if request.method == 'OPTIONS':
         return '', 200
@@ -419,14 +419,44 @@ def api_verify_session():
             'error': error or 'INVALID_TOKEN'
         }), 401
     
-    return jsonify({
-        "success": True,
-        "user": {
-            "id": payload.get('user_id'),
-            "username": payload.get('username'),
-            "role": payload.get('user_role')
-        }
-    }), 200
+    # Get user_id from token
+    user_id = payload.get('user_id')
+    
+    # Fetch user role from database (always up-to-date)
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            'success': False,
+            'message': 'Database connection failed',
+            'error': 'DB_ERROR'
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        db_query.execute("SELECT user_role FROM user WHERE user_id = %s", (user_id,))
+        user = db_query.fetchone()
+        db_query.close()
+        connection.close()
+        
+        user_role = user.get('user_role') if user else None
+        
+        return jsonify({
+            "success": True,
+            "user": {
+                "id": user_id,
+                "username": payload.get('username'),
+                "role": user_role  # From database, not token
+            }
+        }), 200
+    except Exception as e:
+        print(f"Error fetching user role in verify-session: {e}")
+        if connection:
+            connection.close()
+        return jsonify({
+            'success': False,
+            'message': 'Error verifying session',
+            'error': 'DB_ERROR'
+        }), 500
 
 
 @app.route('/register', methods=['GET', 'POST'])

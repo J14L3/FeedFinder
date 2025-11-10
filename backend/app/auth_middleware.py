@@ -6,6 +6,7 @@ Provides decorators and middleware for protecting routes with session validation
 from functools import wraps
 from flask import request, jsonify, make_response
 from app.session_manager import verify_session_token
+from app.db import get_db_connection
 import os
 
 
@@ -27,9 +28,39 @@ def get_token_from_request():
     return None
 
 
+def get_user_role_from_db(user_id):
+    """
+    Get user role from database.
+    Returns the user_role string or None if user not found.
+    """
+    if not user_id:
+        return None
+    
+    connection = get_db_connection()
+    if not connection:
+        return None
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        db_query.execute("SELECT user_role FROM user WHERE user_id = %s", (user_id,))
+        user = db_query.fetchone()
+        db_query.close()
+        connection.close()
+        
+        if user:
+            return user.get('user_role')
+        return None
+    except Exception as e:
+        print(f"Error fetching user role from database: {e}")
+        if connection:
+            connection.close()
+        return None
+
+
 def require_auth(f):
     """
     Decorator to require authentication for a route.
+    Fetches user role from database to ensure it's always up-to-date.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -51,10 +82,16 @@ def require_auth(f):
                 'error': error or 'INVALID_TOKEN'
             }), 401
         
+        # Get user_id from token
+        user_id = payload.get('user_id')
+        
+        # Fetch user role from database (always up-to-date)
+        user_role = get_user_role_from_db(user_id)
+        
         # Add user info to request context
-        request.user_id = payload.get('user_id')
+        request.user_id = user_id
         request.username = payload.get('username')
-        request.user_role = payload.get('user_role')
+        request.user_role = user_role  # From database, not token
         request.session_id = payload.get('session_id')
         
         return f(*args, **kwargs)
@@ -66,6 +103,7 @@ def optional_auth(f):
     """
     Decorator that allows optional authentication.
     If token is present and valid, sets user info in request context.
+    Fetches user role from database to ensure it's always up-to-date.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -74,9 +112,13 @@ def optional_auth(f):
         if token:
             is_valid, payload, error = verify_session_token(token)
             if is_valid:
-                request.user_id = payload.get('user_id')
+                user_id = payload.get('user_id')
+                # Fetch user role from database (always up-to-date)
+                user_role = get_user_role_from_db(user_id)
+                
+                request.user_id = user_id
                 request.username = payload.get('username')
-                request.user_role = payload.get('user_role')
+                request.user_role = user_role  # From database, not token
                 request.session_id = payload.get('session_id')
             else:
                 # Token invalid but route allows unauthenticated access
@@ -139,19 +181,26 @@ def require_admin(f):
     """
     Decorator to require admin role for a route.
     Must be used after require_auth or will fail.
+    Verifies admin role from database to ensure it's always up-to-date.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Check if user is authenticated (require_auth should be used first)
-        if not hasattr(request, 'user_role'):
+        if not hasattr(request, 'user_id') or not request.user_id:
             return jsonify({
                 'success': False,
                 'message': 'Authentication required',
                 'error': 'NO_AUTH'
             }), 401
         
+        # Get user role from database (always up-to-date, even if require_auth already set it)
+        user_role = get_user_role_from_db(request.user_id)
+        
+        # Update request.user_role with fresh database value
+        request.user_role = user_role
+        
         # Check if user has admin role
-        if request.user_role != 'admin':
+        if not user_role or user_role.lower() != 'admin':
             return jsonify({
                 'success': False,
                 'message': 'Admin access required',
