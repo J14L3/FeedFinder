@@ -1091,78 +1091,9 @@ def upload_media():
 def serve_upload(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
-@app.route("/api/posts/<int:user_id>", methods=["GET"])
-def get_user_posts(user_id):
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
-    db_query = connection.cursor(dictionary=True)
-    # get user's post query
-    db_query.execute("SELECT post_id, content_text, media_url, privacy, created_at FROM post WHERE user_id=%s ORDER BY created_at DESC", (user_id,))
-    posts = db_query.fetchall(); db_query.close(); connection.close()
-    return jsonify(posts)
-
-# --- Post Update/Delete ---
-@app.route("/api/posts/<int:post_id>", methods=["PUT"])  # body: { user_id, content_text, media_url, privacy }
-def api_update_post(post_id):
-    data = request.get_json()
-    user_id = int(data.get("user_id"))
-    text = data.get("content_text")
-    media = data.get("media_url")
-    privacy = data.get("privacy")
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
-    try:
-        db_query = connection.cursor(dictionary=True)
-        db_query.execute( # update post query
-            """
-            UPDATE post
-            SET content_text=%s, media_url=%s, privacy=%s, updated_at=NOW()
-            WHERE post_id=%s AND user_id=%s
-            """,
-            (text, media, privacy, post_id, user_id)
-        )
-        connection.commit()
-        if db_query.rowcount == 0:
-            return jsonify({"error": "Not found or not owner."}), 404
-        return jsonify({"message": "Post updated."})
-    finally:
-        db_query.close(); connection.close()
-
-@app.route("/api/posts/<int:post_id>", methods=["DELETE"])  # body: { user_id }
-def api_delete_post(post_id):
-    data = request.get_json()
-    user_id = int(data.get("user_id"))
-    # Connect to DB
-    connection = get_db_connection()
-    if connection is None:
-        return jsonify({
-            "success": False,
-            "message": "Database connection failed."
-        }), 500
-    
-    db_query = connection.cursor(dictionary=True)
-    try: # delete post query
-        db_query.execute("DELETE FROM post WHERE post_id=%s AND user_id=%s", (post_id, user_id))
-        connection.commit()
-        if db_query.rowcount == 0:
-            return jsonify({"error": "Not found or not owner."}), 404
-        return jsonify({"message": "Post deleted."})
-    finally:
-        db_query.close(); connection.close()
-
 # --- Post Visibility (public / friends / exclusive) ---
+# IMPORTANT: This route must come BEFORE /api/posts/<int:user_id> to avoid route conflicts
+# Flask matches routes in order, and more specific routes should come first
 @app.route("/api/posts/user/<int:creator_id>", methods=["GET"])
 @optional_auth
 def api_view_creator_posts(creator_id):
@@ -1286,6 +1217,77 @@ def api_view_creator_posts(creator_id):
     finally:
         db_query.close()
         connection.close()
+
+@app.route("/api/posts/<int:user_id>", methods=["GET"])
+def get_user_posts(user_id):
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    db_query = connection.cursor(dictionary=True)
+    # get user's post query
+    db_query.execute("SELECT post_id, content_text, media_url, privacy, created_at FROM post WHERE user_id=%s ORDER BY created_at DESC", (user_id,))
+    posts = db_query.fetchall(); db_query.close(); connection.close()
+    return jsonify(posts)
+
+# --- Post Update/Delete ---
+@app.route("/api/posts/<int:post_id>", methods=["PUT"])  # body: { user_id, content_text, media_url, privacy }
+def api_update_post(post_id):
+    data = request.get_json()
+    user_id = int(data.get("user_id"))
+    text = data.get("content_text")
+    media = data.get("media_url")
+    privacy = data.get("privacy")
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        db_query.execute( # update post query
+            """
+            UPDATE post
+            SET content_text=%s, media_url=%s, privacy=%s, updated_at=NOW()
+            WHERE post_id=%s AND user_id=%s
+            """,
+            (text, media, privacy, post_id, user_id)
+        )
+        connection.commit()
+        if db_query.rowcount == 0:
+            return jsonify({"error": "Not found or not owner."}), 404
+        return jsonify({"message": "Post updated."})
+    finally:
+        db_query.close(); connection.close()
+
+@app.route("/api/posts/<int:post_id>", methods=["DELETE"])  # body: { user_id }
+def api_delete_post(post_id):
+    data = request.get_json()
+    user_id = int(data.get("user_id"))
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    db_query = connection.cursor(dictionary=True)
+    try: # delete post query
+        db_query.execute("DELETE FROM post WHERE post_id=%s AND user_id=%s", (post_id, user_id))
+        connection.commit()
+        if db_query.rowcount == 0:
+            return jsonify({"error": "Not found or not owner."}), 404
+        return jsonify({"message": "Post deleted."})
+    finally:
+        db_query.close(); connection.close()
         
 # --- get random public posts and display ---
 @app.route("/api/posts/public", methods=["GET"])
