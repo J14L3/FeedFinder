@@ -57,7 +57,7 @@ const FeedFinder = () => {
         if (user) {
           setIsLoggedIn(true);
           if (user.id) {
-            setCurrentUserId(user.id);
+            setCurrentUserId(user.id ?? user.user_id ?? null);
           }
           if (user.role) {
             setUserRole(user.role);

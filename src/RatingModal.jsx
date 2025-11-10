@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { API_BASE } from './config';
 import { X, Star } from 'lucide-react';
 
-const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
+const RatingModal = ({ post, setShowRatingModal, currentUserId }) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
   const getRatingText = (rating) => {
-    return rating === 5 ? 'Excellent!' : rating === 4 ? 'Great!' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : rating === 1 ?'Needs Improvement' : 'Poor';
+    return rating === 5 ? 'Excellent!' : rating === 4 ? 'Great!' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : rating === 1 ? 'Needs Improvement' : 'Poor';
   };
 
   const handleSubmit = async () => {
@@ -25,14 +26,14 @@ const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
     try {
       const res = await fetch(`${API_BASE}/api/rate`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: currentUserId,
           target_email: post.author.email,
           rating_value: rating
         })
       });
-      const data = await res.json().catch(()=> ({}));
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.message || 'Failed to submit rating');
 
       alert('You have submitted a rating');
@@ -70,7 +71,7 @@ const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
           <div className="mb-6 text-center">
             <label className="block text-sm font-medium mb-3">Your Rating</label>
             <div className="flex justify-center gap-2 mb-4">
-              {[1,2,3,4,5].map(star => (
+              {[1, 2, 3, 4, 5].map(star => (
                 <button key={star}
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(0)}
@@ -84,8 +85,24 @@ const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
             {rating > 0 && <p className="text-lg font-semibold text-gray-700">{getRatingText(rating)}</p>}
           </div>
 
-          <button disabled={rating === 0} className="w-full bg-yellow-400 text-gray-900 font-semibold py-4 rounded-xl hover:bg-yellow-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          {/* <button disabled={rating === 0} className="w-full bg-yellow-400 text-gray-900 font-semibold py-4 rounded-xl hover:bg-yellow-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             <Star size={20} /> Submit Rating
+          </button> */}
+          <button
+            onClick={handleSubmit}
+            disabled={submitting || rating === 0}
+            className="w-full bg-yellow-400 text-gray-900 font-semibold py-4 rounded-xl hover:bg-yellow-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {submitting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Star size={20} /> Submit Rating
+              </>
+            )}
           </button>
         </div>
       </div>
