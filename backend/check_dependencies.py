@@ -6,8 +6,18 @@ Checks if all required dependencies are installed and optionally checks for upda
 
 import sys
 import subprocess
-import pkg_resources
 from pathlib import Path
+
+# Use importlib.metadata (Python 3.8+) instead of deprecated pkg_resources
+try:
+    from importlib.metadata import distributions, version, PackageNotFoundError
+except ImportError:
+    # Fallback for Python 3.7 and below (though not recommended)
+    try:
+        from importlib_metadata import distributions, version, PackageNotFoundError
+    except ImportError:
+        print("❌ Error: importlib.metadata not available. Please use Python 3.8 or higher.")
+        sys.exit(1)
 
 def read_requirements():
     """Read requirements.txt and return list of required packages."""
@@ -44,18 +54,42 @@ def check_installed_packages():
     
     missing_packages = []
     wrong_version = []
-    installed_packages = {pkg.key.lower(): pkg.version for pkg in pkg_resources.working_set}
+    
+    # Build a dictionary of installed packages using importlib.metadata
+    installed_packages = {}
+    try:
+        for dist in distributions():
+            # Normalize package name to lowercase for comparison
+            # Some packages have different naming conventions (e.g., Flask vs flask)
+            dist_name = dist.name
+            if dist_name:
+                installed_packages[dist_name.lower()] = dist.version
+    except Exception as e:
+        print(f"⚠️  Error reading installed packages: {e}")
+        # Fallback: try to get packages individually
+        installed_packages = {}
     
     print("🔍 Checking Python dependencies...\n")
     
     for package_name, required_version in requirements:
         package_key = package_name.lower()
         
-        if package_key not in installed_packages:
+        # Try to get version using importlib.metadata.version as fallback
+        installed_version = None
+        if package_key in installed_packages:
+            installed_version = installed_packages[package_key]
+        else:
+            # Try direct lookup (case-insensitive)
+            try:
+                installed_version = version(package_name)
+                installed_packages[package_key] = installed_version
+            except PackageNotFoundError:
+                pass
+        
+        if installed_version is None:
             missing_packages.append(package_name)
             print(f"❌ {package_name} - NOT INSTALLED")
         else:
-            installed_version = installed_packages[package_key]
             if required_version:
                 if installed_version != required_version:
                     wrong_version.append((package_name, required_version, installed_version))
