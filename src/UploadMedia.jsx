@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image, Video, File, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
 import { API_BASE } from './config';
 
