@@ -24,6 +24,7 @@ FeedFinder is a modern, secure social media platform built with React and Flask.
 - 🔐 **Secure Authentication** - Session-based authentication with Argon2 password hashing
 - 👤 **User Profiles** - Customizable user profiles with statistics
 - 📝 **Post Management** - Create, edit, and delete posts with media support
+- - 🔐👨Admin account:  administrator: Lee1Yong2Zhang3Is4ME
 - 🔍 **Search Functionality** - Search posts and users across the platform
 - ⭐ **Rating System** - Rate user profiles with comments
 - 🔒 **Privacy Controls** - Public, private, and friends-only post privacy settings
