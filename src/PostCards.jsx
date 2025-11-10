@@ -2,10 +2,23 @@ import React from 'react';
 import { Star, DollarSign, Lock, Crown, FileText } from 'lucide-react';
 
 // Simple URL allowlist for images to reduce risk of scriptable URLs
-const isSafeImageUrl = (url) => {
-  if (!url || typeof url !== 'string') return false;
-  return /^(https?:\/\/|data:image\/(?:png|jpeg|jpg|gif|webp);|blob:|\/|\.\/)/i.test(url);
-};
+// const isSafeImageUrl = (url) => {
+//   if (!url || typeof url !== 'string') return false;
+//   return /^(https?:\/\/|data:image\/(?:png|jpeg|jpg|gif|webp);|blob:|\/|\.\/)/i.test(url);
+// };
+
+const isRelativeOrTrusted = (url) =>
+  /^(https?:\/\/|blob:|\/|\.\/)/i.test(url || "");
+
+// images only
+export const isSafeImageUrl = (url = "") =>
+  isRelativeOrTrusted(url) &&
+  /\.(png|jpe?g|gif|webp|avif)$/i.test(new URL(url, window.location.origin).pathname);
+
+// videos only
+export const isSafeVideoUrl = (url = "") =>
+  isRelativeOrTrusted(url) &&
+  /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
 
 const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
   return (
@@ -76,7 +89,7 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
       )}
       {post.type === 'video' && !post.isExclusive && (
         <div className="relative w-full aspect-square bg-gray-900">
-          {isSafeImageUrl(post.content) ? (
+          {isSafeVideoUrl(post.content) ? (
             <img
               src={post.content}
               alt="Video thumbnail"
