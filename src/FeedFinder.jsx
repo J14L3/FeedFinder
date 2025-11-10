@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings } from 'lucide-react';
+import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings, Shield } from 'lucide-react';
 import { API_BASE } from './config'; 
 import CreatePostModal from './CreatePostModal';
 import RatingModal from './RatingModal';
@@ -10,6 +10,7 @@ import UploadMedia from './UploadMedia';
 import SettingsPage from './SettingsPage';
 import PremiumUpgrade from './PremiumUpgrade';
 import ProfilePage from './ProfilePage';
+import AdminPage from './AdminPage';
 
 // Load all images in the folder dynamically (Vite)
 const imageUrls = import.meta.glob('./assets/images/*.{png,jpg,jpeg,gif,webp,avif}', {
@@ -43,6 +44,7 @@ const FeedFinder = () => {
   const [feedError, setFeedError] = useState("");
   const [viewingProfile, setViewingProfile] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const userMenuRef = useRef(null);
 
 
@@ -56,6 +58,9 @@ const FeedFinder = () => {
           setIsLoggedIn(true);
           if (user.id) {
             setCurrentUserId(user.id);
+          }
+          if (user.role) {
+            setUserRole(user.role);
           }
         }
       } catch (error) {
@@ -279,6 +284,18 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('admin');
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                      >
+                        <Shield size={18} />
+                        Admin Panel
+                      </button>
+                    )}
                     {/* {!isPremium && (
                       <button
                         onClick={() => {
@@ -341,6 +358,8 @@ const FeedFinder = () => {
           <SettingsPage />
         ) : activeTab === 'premium' ? (
           <PremiumUpgrade setIsPremium={setIsPremium} setActiveTab={setActiveTab} />
+        ) : activeTab === 'admin' ? (
+          <AdminPage />
         ) : activeTab === 'search' ? (
           <div className="text-center py-12">
             <Search size={48} className="mx-auto text-gray-400 mb-4" />

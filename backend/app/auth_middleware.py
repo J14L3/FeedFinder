@@ -134,3 +134,30 @@ def clear_auth_cookies(response):
     response.set_cookie('refresh_token', '', expires=0, path='/')
     return response
 
+
+def require_admin(f):
+    """
+    Decorator to require admin role for a route.
+    Must be used after require_auth or will fail.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if user is authenticated (require_auth should be used first)
+        if not hasattr(request, 'user_role'):
+            return jsonify({
+                'success': False,
+                'message': 'Authentication required',
+                'error': 'NO_AUTH'
+            }), 401
+        
+        # Check if user has admin role
+        if request.user_role != 'admin':
+            return jsonify({
+                'success': False,
+                'message': 'Admin access required',
+                'error': 'INSUFFICIENT_PERMISSIONS'
+            }), 403
+        
+        return f(*args, **kwargs)
+    
+    return decorated_function
