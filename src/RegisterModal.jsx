@@ -425,7 +425,7 @@ const RegisterPage = ({ setShowLoginModal, setIsLoggedIn }) => {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          © 2024 FeedFinder. All rights reserved.
+          © 2025 FeedFinder. All rights reserved.
         </p>
       </div>
     </div>
