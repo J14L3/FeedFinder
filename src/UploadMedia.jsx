@@ -7,24 +7,23 @@ const UploadMedia = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [postDescription, setPostDescription] = useState('');
   const [isPosting, setIsPosting] = useState(false);
-  const [currUserId, setCurrUserId] = useState(null); 
+  const [currUserId, setCurrUserId] = useState(null);
   const fileInputRef = useRef(null);
 
   // get userid
-  // Fetch logged-in user info once on component mount
   useEffect(() => {
-    const fetchUser = async () => {
+    (async () => {
       try {
+        const { verifySession } = await import('./authService'); // <- dynamic import
         const user = await verifySession();
         if (user) {
           setCurrUserId(user.id);
-          console.log("Current logged-in user ID:", user.id);
+          console.log('Current logged-in user ID:', user.id);
         }
       } catch (err) {
-        console.error("Failed to get user ID:", err);
+        console.error('Failed to get user ID:', err);
       }
-    };
-    fetchUser();
+    })();
   }, []);
 
   // Accepted file types
