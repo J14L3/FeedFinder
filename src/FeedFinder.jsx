@@ -59,8 +59,13 @@ const FeedFinder = () => {
           if (user.id) {
             setCurrentUserId(user.id ?? user.user_id ?? null);
           }
-          if (user.role) {
-            setUserRole(user.role);
+          // Check both 'role' and 'user_role' fields, and handle empty strings
+          const role = user.role || user.user_role;
+          if (role) {
+            console.log('User role detected:', role);
+            setUserRole(role);
+          } else {
+            console.warn('No role found in user object:', user);
           }
         }
       } catch (error) {
@@ -71,6 +76,11 @@ const FeedFinder = () => {
     };
     checkAuth();
   }, []);
+
+  // Debug: Log userRole changes
+  useEffect(() => {
+    console.log('userRole state changed:', userRole);
+  }, [userRole]);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -284,7 +294,7 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {userRole === 'admin' && (
+                    {userRole && userRole.toLowerCase() === 'admin' && (
                       <button
                         onClick={() => {
                           setActiveTab('admin');
