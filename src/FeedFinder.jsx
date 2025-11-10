@@ -360,6 +360,7 @@ const FeedFinder = () => {
                isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
                isLoggedIn={isLoggedIn}
                isPremium={isPremium}
+               currentUserId={currentUserId}
                setShowDonateModal={setShowDonateModal}
                setShowRatingModal={setShowRatingModal}
                onBack={() => {

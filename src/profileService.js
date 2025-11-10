@@ -74,20 +74,42 @@ export async function fetchCurrentUserProfile() {
  * The backend endpoint uses optional_auth, so viewerId is determined from the session token
  */
 export async function fetchUserPosts(userId, viewerId = null) {
+  if (!userId) {
+    console.error('fetchUserPosts: userId is required');
+    return [];
+  }
+
   try {
     const url = `${API_BASE}/api/posts/user/${userId}`;
+    console.log('fetchUserPosts: Fetching posts for userId:', userId, 'viewerId:', viewerId);
 
     const response = await authenticatedFetch(url, {
       method: 'GET',
     });
 
+    console.log('fetchUserPosts: Response status:', response.status);
+
     if (response.ok) {
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      console.log('fetchUserPosts: Received data:', data);
+      console.log('fetchUserPosts: Is array?', Array.isArray(data), 'Length:', Array.isArray(data) ? data.length : 'N/A');
+      
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.items)) {
+        // Handle case where response might be wrapped
+        return data.items;
+      } else {
+        console.warn('fetchUserPosts: Unexpected response format:', data);
+        return [];
+      }
+    } else {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('fetchUserPosts: Error response:', response.status, errorText);
     }
     return [];
   } catch (error) {
-    console.error('Error fetching user posts:', error);
+    console.error('fetchUserPosts: Exception caught:', error);
     return [];
   }
 }

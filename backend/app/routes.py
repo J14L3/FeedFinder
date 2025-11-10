@@ -1076,6 +1076,9 @@ def api_view_creator_posts(creator_id):
     # Get viewer ID from authentication (optional)
     viewer_id = getattr(request, 'user_id', None)
     
+    # Debug logging
+    print(f"api_view_creator_posts: creator_id={creator_id}, viewer_id={viewer_id}, is_own_profile={viewer_id == creator_id if viewer_id else False}")
+    
     # Connect to DB
     connection = get_db_connection()
     if connection is None:
@@ -1106,6 +1109,7 @@ def api_view_creator_posts(creator_id):
             )
         elif viewer_id:
             # Viewing someone else's posts - respect privacy
+            # Show: public posts, friends posts (if friendship exists), exclusive posts (if subscribed)
             db_query.execute(
                 """
                 SELECT 
@@ -1136,6 +1140,12 @@ def api_view_creator_posts(creator_id):
                 """,
                 (creator_id, viewer_id, creator_id, creator_id, viewer_id, viewer_id, creator_id)
             )
+            
+            # Log for debugging
+            print(f"Fetching posts for creator_id={creator_id}, viewer_id={viewer_id}")
+            posts_fetched = db_query.fetchall()
+            print(f"Found {len(posts_fetched)} posts")
+            posts = posts_fetched
         else:
             # Not authenticated - only public posts
             db_query.execute(
@@ -1153,8 +1163,8 @@ def api_view_creator_posts(creator_id):
                 """,
                 (creator_id,)
             )
-        
-        posts = db_query.fetchall()
+            
+            posts = db_query.fetchall()
         
         # Format response
         results = []
