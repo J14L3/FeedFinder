@@ -122,7 +122,8 @@ const FeedFinder = () => {
                avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (p.user_name || 'User'),
                rating: 0,
                verified: false,
-               isPremium: false
+               isPremium: false,
+               email : p.user_email
              },
              type: p.media_type || (p.media_url ? inferMediaType(p.media_url) : 'image'),
              content: p.media_url || '',
@@ -326,14 +327,8 @@ const FeedFinder = () => {
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Crown size={20} />
-              <span className="text-sm font-medium">Upgrade to Premium for unlimited ratings and exclusive content!</span>
+              <span className="text-sm font-medium">RATE WITH YOUR FAVOURITE CREATORS! Remember only 3 ratings per day!</span>
             </div>
-            <button
-              onClick={() => setActiveTab('premium')}
-              className="px-4 py-1 bg-white text-orange-600 rounded-full text-sm font-semibold hover:bg-gray-100 transition"
-            >
-              Learn More
-            </button>
           </div>
         </div>
       )}
@@ -458,7 +453,7 @@ const FeedFinder = () => {
 
       {/* Modals */}
       {showCreateModal && <CreatePostModal setShowCreateModal={setShowCreateModal} />}
-      {showRatingModal && <RatingModal post={showRatingModal} setShowRatingModal={setShowRatingModal} />}
+      {showRatingModal && <RatingModal post={showRatingModal} setShowRatingModal={setShowRatingModal} currentUserId={currentUserId}/>}
     </div>
   );
 };

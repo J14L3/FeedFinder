@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, DollarSign, Lock, Crown, FileText } from 'lucide-react';
+import { API_BASE } from './config';
 
 // Simple URL allowlist for images to reduce risk of scriptable URLs
 // const isSafeImageUrl = (url) => {
@@ -19,6 +20,10 @@ export const isSafeImageUrl = (url = "") =>
 export const isSafeVideoUrl = (url = "") =>
   isRelativeOrTrusted(url) &&
   /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
+
+const avgRes = await fetch(`${API_BASE}/api/rating/${encodeURIComponent(p.user_email)}`);
+const avgData = await avgRes.json();
+const avg = avgRes.ok && avgData?.average ? Number(avgData.average) : 0;
 
 const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
   return (
@@ -61,7 +66,7 @@ const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = f
               <span className="text-gray-300">•</span>
               <div className="flex items-center gap-1">
                 <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{post.author.rating}</span>
+                <span className="font-medium">{post.author.rating = avg}</span>
               </div>
             </div>
           </div>

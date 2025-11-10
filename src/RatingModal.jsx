@@ -1,12 +1,44 @@
 import React, { useState } from 'react';
+import { API_BASE } from './config';
 import { X, Star } from 'lucide-react';
 
-const RatingModal = ({ post, setShowRatingModal }) => {
+const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
+  
+  const handleSubmit = async () => {
+    if (!currentUserId) {
+      alert('Please log in to rate.');
+      return;
+    }
+    if (!post?.author?.email) {
+      alert('Error, unable to identify profile.');
+      return;
+    }
+    if (rating === 0) return;
 
-  const getRatingText = (rating) => {
-    return rating === 5 ? 'Excellent!' : rating === 4 ? 'Great!' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : 'Needs Improvement';
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/rate`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          user_id: currentUserId,
+          target_email: post.author.email,
+          rating_value: rating
+        })
+      });
+      const data = await res.json().catch(()=> ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to submit rating');
+
+      alert('You have submitted a rating');
+      setShowRatingModal(null);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not submit rating.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
