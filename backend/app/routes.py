@@ -705,6 +705,103 @@ def get_profile_by_email():
         return jsonify(profile)
     return jsonify({"error": "User not found"}), 404
 
+@app.route("/api/profile/<int:user_id>/stats", methods=["GET"])
+@optional_auth
+def get_profile_stats(user_id):
+    """
+    Get profile statistics for a user.
+    Returns post count, likes, comments, ratings, followers, following, etc.
+    """
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # Get post count
+        db_query.execute("SELECT COUNT(*) as count FROM post WHERE user_id = %s", (user_id,))
+        post_count = db_query.fetchone()['count'] or 0
+        
+        # Get total likes (sum of all likes on user's posts)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM post_like pl
+            JOIN post p ON pl.post_id = p.post_id
+            WHERE p.user_id = %s
+        """, (user_id,))
+        total_likes = db_query.fetchone()['count'] or 0
+        
+        # Get total comments
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM comment c
+            JOIN post p ON c.post_id = p.post_id
+            WHERE p.user_id = %s
+        """, (user_id,))
+        total_comments = db_query.fetchone()['count'] or 0
+        
+        # Get rating stats (convert from 1-10 scale to 1-5 scale)
+        db_query.execute("""
+            SELECT 
+                COUNT(*) as count,
+                AVG(rating_value) as average
+            FROM rating
+            WHERE creator_email = (SELECT user_email FROM user WHERE user_id = %s)
+        """, (user_id,))
+        rating_result = db_query.fetchone()
+        total_ratings = rating_result['count'] or 0
+        avg_rating = (float(rating_result['average']) / 2.0) if rating_result['average'] else 0
+        avg_rating = round(avg_rating, 1) if avg_rating > 0 else 0
+        
+        # Get followers count (users who have this user as a friend)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM friends 
+            WHERE friend_user_id = %s
+        """, (user_id,))
+        followers = db_query.fetchone()['count'] or 0
+        
+        # Get following count (users this user has as friends)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM friends 
+            WHERE user_id = %s
+        """, (user_id,))
+        following = db_query.fetchone()['count'] or 0
+        
+        stats = {
+            "totalPosts": post_count,
+            "totalLikes": total_likes,
+            "totalComments": total_comments,
+            "totalRatings": total_ratings,
+            "averageRating": avg_rating,
+            "followers": followers,
+            "following": following,
+            "totalDonations": 0,  # Placeholder - implement if you have donations table
+            "monthlyDonations": 0,  # Placeholder
+            "topDonation": 0  # Placeholder
+        }
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching profile stats: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching profile statistics"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
+
 @app.route("/api/profile/update", methods=["PUT", "OPTIONS"])
 @require_auth
 def update_profile():
