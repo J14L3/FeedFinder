@@ -493,7 +493,7 @@ const ProfilePage = ({
                   <PostCards
                     key={post.id}
                     post={post}
-                    // currentUserId={currentUserId} 
+                    currentUserId={currentUserId} 
                     setShowRatingModal={setShowRatingModal}
                     isLoggedIn={isLoggedIn}
                     isPremium={isPremium}

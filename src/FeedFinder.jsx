@@ -390,7 +390,7 @@ const FeedFinder = () => {
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Crown size={20} />
-              <span className="text-sm font-medium">RATE WITH YOUR FAVOURITE CREATORS! Remember only 3 ratings per day!</span>
+              <span className="text-sm font-medium">RATE WITH YOUR FAVOURITE CREATORS!</span>
             </div>
           </div>
         </div>

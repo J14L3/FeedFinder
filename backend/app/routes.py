@@ -1133,7 +1133,8 @@ def api_view_creator_posts(creator_id):
     Respects privacy settings: public, friends, exclusive (if subscribed), or own posts.
     """
     # Get viewer ID from authentication (optional)
-    viewer_id = getattr(request, 'user_id', None)
+    # viewer_id = getattr(request, 'user_id', None)
+    viewer_id = request.args.get("viewer", default=0, type=int)
     
     # Debug logging
     print(f"api_view_creator_posts: creator_id={creator_id}, viewer_id={viewer_id}, is_own_profile={viewer_id == creator_id if viewer_id else False}")
