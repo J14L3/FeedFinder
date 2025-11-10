@@ -1037,15 +1037,27 @@ def create_post():
 UPLOAD_FOLDER = "/var/www/feedfinder/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "mp4", "mov", "webm"}
 MAX_FILE_SIZE_MB = 20
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+# Import file validation utilities
+from app.file_validator import validate_uploaded_file, sanitize_filename, get_file_extension
 
 # --- upload media ---
-@app.route("/api/upload", methods=["POST"])
+@app.route("/api/upload", methods=["POST", "OPTIONS"])
+@require_auth
 def upload_media():
+    """
+    Secure file upload endpoint with comprehensive validation.
+    Requires authentication and validates:
+    - File extension
+    - MIME type
+    - File signature (magic bytes)
+    - File size
+    - Filename sanitization
+    """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     try:
         # ensure upload directory exists
         os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -1055,14 +1067,21 @@ def upload_media():
             return jsonify({"success": False, "message": "No file part in request"}), 400
 
         file = request.files["file"]
-        if file.filename == "":
+        original_filename = file.filename
+        
+        if not original_filename or original_filename == "":
             return jsonify({"success": False, "message": "No file selected"}), 400
 
-        # validate file type
-        if not allowed_file(file.filename):
+        # Get Content-Type from request
+        content_type = file.content_type or request.headers.get('Content-Type', '').split(';')[0].strip()
+
+        # Comprehensive file validation (extension, MIME type, file signature)
+        is_valid, error_message, detected_ext = validate_uploaded_file(file, original_filename, content_type)
+        if not is_valid:
+            logging.warning(f"[UPLOAD SECURITY] File validation failed for user {getattr(request, 'user_id', 'unknown')}: {error_message}")
             return jsonify({
                 "success": False,
-                "message": f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+                "message": error_message
             }), 400
 
         # enforce file size limit
@@ -1070,52 +1089,84 @@ def upload_media():
         size_mb = file.tell() / (1024 * 1024)
         file.seek(0)
         if size_mb > MAX_FILE_SIZE_MB:
-            return jsonify({"success": False, "message": f"File too large ({size_mb:.2f}MB). Limit: {MAX_FILE_SIZE_MB}MB"}), 400
+            return jsonify({
+                "success": False, 
+                "message": f"File too large ({size_mb:.2f}MB). Limit: {MAX_FILE_SIZE_MB}MB"
+            }), 400
 
-        # save file securely
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        unique_name = f"{uuid.uuid4().hex}.{ext}"
+        # Sanitize filename and generate secure unique name
+        try:
+            sanitized_filename = sanitize_filename(original_filename)
+        except ValueError as e:
+            logging.warning(f"[UPLOAD SECURITY] Filename sanitization failed: {e}")
+            return jsonify({
+                "success": False,
+                "message": f"Invalid filename: {str(e)}"
+            }), 400
+
+        # Use detected extension from validation (more secure than parsing filename)
+        if not detected_ext:
+            detected_ext = get_file_extension(sanitized_filename)
+        
+        # Generate unique filename with validated extension
+        unique_name = f"{uuid.uuid4().hex}.{detected_ext}"
+        
+        # Prevent path traversal in save path
         save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
+        
+        # Additional security: ensure the resolved path is within upload folder
+        upload_folder_abs = os.path.abspath(app.config["UPLOAD_FOLDER"])
+        save_path_abs = os.path.abspath(save_path)
+        if not save_path_abs.startswith(upload_folder_abs):
+            logging.error(f"[UPLOAD SECURITY] Path traversal attempt detected: {save_path_abs}")
+            return jsonify({
+                "success": False,
+                "message": "Invalid file path"
+            }), 400
 
         try:
+            # Save file
             file.save(save_path)
 
-            ext = os.path.splitext(unique_name)[1].lower().lstrip('.')
-            if ext in ('mp4','mov','webm'):
+            # Determine media type based on validated extension
+            if detected_ext in ('mp4', 'mov', 'webm'):
                 media_type = 'video'
             else:
                 media_type = 'image'
 
         except PermissionError as e:
-            print(f"[UPLOAD ERROR] Permission denied: {e}")
+            logging.error(f"[UPLOAD ERROR] Permission denied: {e}")
             return jsonify({
                 "success": False,
-                "message": f"Permission denied when saving file to {save_path}. Check folder ownership and chmod."
+                "message": f"Permission denied when saving file. Please contact administrator."
             }), 500
         except FileNotFoundError as e:
-            print(f"[UPLOAD ERROR] Folder not found: {e}")
+            logging.error(f"[UPLOAD ERROR] Folder not found: {e}")
             return jsonify({
                 "success": False,
-                "message": f"Upload folder not found: {app.config['UPLOAD_FOLDER']}"
+                "message": f"Upload folder not found. Please contact administrator."
             }), 500
         except Exception as e:
-            print(f"[UPLOAD ERROR] Unexpected: {e}")
+            logging.error(f"[UPLOAD ERROR] Unexpected: {e}")
             return jsonify({
                 "success": False,
                 "message": f"Unexpected error while saving file: {str(e)}"
             }), 500
 
-        # unique media URL
-        media_url = f"/uploads/{unique_name}"  # relative for frontend
+        # unique media URL (relative for frontend)
+        media_url = f"/uploads/{unique_name}"
 
+        logging.info(f"[UPLOAD SUCCESS] User {getattr(request, 'user_id', 'unknown')} uploaded {detected_ext} file: {unique_name}")
+        
         return jsonify({
             "success": True,
             "message": "File uploaded successfully",
-            "media_url": media_url
+            "media_url": media_url,
+            "media_type": media_type
         }), 201
 
     except Exception as e:
-        print(f"[UPLOAD ERROR] Outer catch: {e}")
+        logging.error(f"[UPLOAD ERROR] Outer catch: {e}")
         return jsonify({
             "success": False,
             "message": f"Unexpected server error: {str(e)}"
@@ -1125,7 +1176,34 @@ def upload_media():
 # lets frontend load media directly from the path below
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    """
+    Serve uploaded media files securely.
+    Prevents path traversal attacks by validating the filename.
+    """
+    try:
+        # Sanitize filename to prevent path traversal
+        sanitized = sanitize_filename(filename)
+        
+        # Additional security: ensure resolved path is within upload folder
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], sanitized)
+        upload_folder_abs = os.path.abspath(app.config["UPLOAD_FOLDER"])
+        file_path_abs = os.path.abspath(file_path)
+        
+        if not file_path_abs.startswith(upload_folder_abs):
+            logging.warning(f"[SERVE UPLOAD SECURITY] Path traversal attempt: {filename}")
+            return jsonify({"error": "File not found"}), 404
+        
+        # Check if file exists
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            return jsonify({"error": "File not found"}), 404
+        
+        return send_from_directory(app.config["UPLOAD_FOLDER"], sanitized)
+    except ValueError as e:
+        logging.warning(f"[SERVE UPLOAD SECURITY] Invalid filename: {filename}")
+        return jsonify({"error": "File not found"}), 404
+    except Exception as e:
+        logging.error(f"[SERVE UPLOAD ERROR] {e}")
+        return jsonify({"error": "Error serving file"}), 500
 
 # --- Post Visibility (public / friends / exclusive) ---
 # IMPORTANT: This route must come BEFORE /api/posts/<int:user_id> to avoid route conflicts

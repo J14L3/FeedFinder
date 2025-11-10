@@ -150,6 +150,7 @@ const UploadMedia = () => {
         const uploadRes = await fetch(`${API_BASE}/api/upload`, {
           method: "POST",
           body: formData,
+          credentials: 'include', // Include cookies for authentication
         });
         const uploadData = await uploadRes.json();
 
