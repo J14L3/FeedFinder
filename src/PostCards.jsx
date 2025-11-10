@@ -15,7 +15,7 @@ export const isSafeVideoUrl = (url = "") =>
   isRelativeOrTrusted(url) &&
   /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
 
-const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick, currentUserId }) => {
+const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
   const [avgRating, setAvgRating] = useState(null);
   const [ratingCount, setRatingCount] = useState(null);
   //checks if is own post
