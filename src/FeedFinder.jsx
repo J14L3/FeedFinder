@@ -389,6 +389,7 @@ const FeedFinder = () => {
                      key={post.id}
                      post={post}
                      setShowRatingModal={setShowRatingModal}
+                     currentUserId={currentUserId} 
                      isLoggedIn={isLoggedIn}
                      isPremium={isPremium}
                      onAuthorClick={() => {
