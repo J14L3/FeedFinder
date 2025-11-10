@@ -5,7 +5,11 @@ import { X, Star } from 'lucide-react';
 const RatingModal = ({ post, setShowRatingModal, currentUserId}) => {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  
+
+  const getRatingText = (rating) => {
+    return rating === 5 ? 'Excellent!' : rating === 4 ? 'Great!' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : rating === 1 ?'Needs Improvement' : 'Poor';
+  };
+
   const handleSubmit = async () => {
     if (!currentUserId) {
       alert('Please log in to rate.');

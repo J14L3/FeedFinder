@@ -1392,7 +1392,7 @@ def rate_user():
     rated_user_id = target["user_id"]
     db_query.execute("INSERT INTO rating (user_id, rated_user_id, rating_value) VALUES (%s,%s,%s)", (user_id, rated_user_id, rating))
     connection.commit(); db_query.close(); connection.close()
-    return jsonify({"message": f"Rated {target_email} with {rating}/10."})
+    return jsonify({"message": f"Rated {target_email} with {rating}/5."})
 
 @app.route("/api/rating/<email>", methods=["GET"])
 def view_rating(email):
