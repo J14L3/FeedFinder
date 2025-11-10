@@ -25,7 +25,7 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
     <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition mb-8 border-2 border-gray-200">
       {/* Author Header */}
       <div className="p-4 flex items-center justify-between">
-        <div 
+        <div
           className={`flex items-center gap-3 ${onAuthorClick ? 'cursor-pointer hover:opacity-80 transition' : ''}`}
           onClick={onAuthorClick}
         >
@@ -90,18 +90,25 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
       {post.type === 'video' && !post.isExclusive && (
         <div className="relative w-full aspect-square bg-gray-900">
           {isSafeVideoUrl(post.content) ? (
-            <img
+            // <img
+            //   src={post.content}
+            //   alt="Video thumbnail"
+            //   className="w-full h-full object-cover"
+            //   loading="lazy"
+            //   decoding="async"
+            //   referrerPolicy="no-referrer"
+            //   crossOrigin="anonymous"
+            // />
+            <video
               src={post.content}
-              alt="Video thumbnail"
-              className="w-full h-full object-cover"
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              crossOrigin="anonymous"
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-contain bg-black"
             />
           ) : (
             <div className="w-full h-full bg-gray-800 flex items-center justify-center text-gray-400">
-              Video thumbnail unavailable
+              Video unavailable
             </div>
           )}
           <div className="absolute inset-0 flex items-center justify-center">
@@ -127,7 +134,7 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
             <Lock size={48} className="mx-auto mb-3" />
             <p className="font-bold text-xl mb-2">Exclusive Content</p>
             <p className="text-sm mb-4">Support this creator to unlock</p>
-            <button 
+            <button
               onClick={() => setShowDonateModal(post)}
               className="bg-white text-orange-600 px-6 py-2 rounded-full font-semibold hover:bg-gray-100 transition"
             >
@@ -157,14 +164,14 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
         <p className="text-gray-800 mb-3">{post.caption}</p>
         <div className="flex items-center justify-end pt-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => isLoggedIn ? setShowRatingModal(post) : window.alert('Please login to rate profiles')} 
+            <button
+              onClick={() => isLoggedIn ? setShowRatingModal(post) : window.alert('Please login to rate profiles')}
               className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-full font-medium transition flex items-center gap-1"
             >
               <Star size={16} /> Rate
             </button>
-            <button 
-              onClick={() => setShowDonateModal(post)} 
+            <button
+              onClick={() => setShowDonateModal(post)}
               className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full font-medium transition flex items-center gap-1"
             >
               <DollarSign size={16} /> Donate
