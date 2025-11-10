@@ -5,7 +5,6 @@ import {
   Users, Award, TrendingUp
 } from 'lucide-react';
 import PostCards from './PostCards';
-import DonateModal from './DonateModal';
 import RatingModal from './RatingModal';
 import { fetchProfile, fetchUserPosts, fetchProfileStats, updateProfile } from './profileService';
 import { authenticatedFetch } from './authService';
@@ -16,7 +15,6 @@ const ProfilePage = ({
   isOwnProfile = false,
   isLoggedIn = false,
   isPremium = false,
-  setShowDonateModal,
   setShowRatingModal,
   onBack
 }) => {
@@ -357,13 +355,6 @@ const ProfilePage = ({
                             <Star size={18} />
                             Rate
                           </button>
-                          <button
-                            onClick={() => setShowDonateModal({ author: userProfile })}
-                            className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-full font-medium transition flex items-center gap-2"
-                          >
-                            <DollarSign size={18} />
-                            Donate
-                          </button>
                         </>
                       )}
                     </div>
@@ -455,7 +446,6 @@ const ProfilePage = ({
                   <PostCards
                     key={post.id}
                     post={post}
-                    setShowDonateModal={setShowDonateModal}
                     setShowRatingModal={setShowRatingModal}
                     isLoggedIn={isLoggedIn}
                     isPremium={isPremium}

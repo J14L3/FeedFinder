@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings } from 'lucide-react';
 import { API_BASE } from './config'; 
 import CreatePostModal from './CreatePostModal';
-import DonateModal from './DonateModal';
 import RatingModal from './RatingModal';
 import LoginPage from './LoginModal';
 import RegisterPage from './RegisterModal';
@@ -32,7 +31,6 @@ const inferMediaType = (url = "") => {
 const FeedFinder = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDonateModal, setShowDonateModal] = useState(null);
   const [showRatingModal, setShowRatingModal] = useState(null);
   const [showRegisterPage, setShowRegisterPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -360,7 +358,6 @@ const FeedFinder = () => {
                isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
                isLoggedIn={isLoggedIn}
                isPremium={isPremium}
-               setShowDonateModal={setShowDonateModal}
                setShowRatingModal={setShowRatingModal}
                onBack={() => {
                  setViewingProfile(null);
@@ -395,7 +392,6 @@ const FeedFinder = () => {
                    <PostCards
                      key={post.id}
                      post={post}
-                     setShowDonateModal={setShowDonateModal}
                      setShowRatingModal={setShowRatingModal}
                      isLoggedIn={isLoggedIn}
                      isPremium={isPremium}
@@ -461,7 +457,6 @@ const FeedFinder = () => {
 
       {/* Modals */}
       {showCreateModal && <CreatePostModal setShowCreateModal={setShowCreateModal} />}
-      {showDonateModal && <DonateModal post={showDonateModal} setShowDonateModal={setShowDonateModal} />}
       {showRatingModal && <RatingModal post={showRatingModal} setShowRatingModal={setShowRatingModal} />}
     </div>
   );
