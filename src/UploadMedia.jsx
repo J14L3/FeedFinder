@@ -143,6 +143,7 @@ const UploadMedia = () => {
     try {
       // upload media file
       let mediaUrl = "";
+      let mediaType = "image"; 
       if (uploadedFile) {
         const formData = new FormData();
         formData.append("file", uploadedFile.file);
@@ -159,7 +160,9 @@ const UploadMedia = () => {
         }
 
         mediaUrl = uploadData.media_url;
-        const mediaType = uploadData.media_type || 'image';
+        mediaType = uploadData.media_type ||
+      (/\.(mp4|webm|mov|ogg)$/i.test(mediaUrl) ? "video" :
+       /\.(png|jpe?g|gif|webp|avif)$/i.test(mediaUrl) ? "image" : "image");
 
       }
 
