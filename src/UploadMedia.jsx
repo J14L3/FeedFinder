@@ -159,6 +159,8 @@ const UploadMedia = () => {
         }
 
         mediaUrl = uploadData.media_url;
+        const mediaType = uploadData.media_type || 'image';
+
       }
 
       // create post
@@ -169,6 +171,7 @@ const UploadMedia = () => {
           user_id: currUserId,
           content_text: postDescription,
           media_url: mediaUrl,
+          media_type: mediaType,
           privacy: "public",
         }),
       });

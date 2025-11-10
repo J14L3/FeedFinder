@@ -23,6 +23,12 @@ const imagesByName = Object.fromEntries(
   Object.entries(imageUrls).map(([path, url]) => [path.split('/').pop(), url])
 );
 
+const inferMediaType = (url = "") => {
+  const ext = url.split(".").pop()?.toLowerCase() || "";
+  if (["mp4","mov","webm"].includes(ext)) return "video";
+  return "image";
+};
+
 const FeedFinder = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -120,7 +126,7 @@ const FeedFinder = () => {
                verified: false,
                isPremium: false
              },
-             type: p.media_url ? 'image' : 'text',
+             type: p.media_type || (p.media_url ? inferMediaType(p.media_url) : 'image'),
              content: p.media_url || '',
              caption: p.content_text || '',
              timestamp: p.created_at ? formatTimestamp(p.created_at) : 'Just now',

@@ -876,7 +876,16 @@ def update_profile():
 @app.route("/api/posts", methods=["POST"])
 def create_post():
     data = request.get_json()
-    user_id, text, media, privacy = data.get("user_id"), data.get("content_text"), data.get("media_url"), data.get("privacy")
+    user_id, text, media, privacy, media_type = data.get("user_id"), data.get("content_text"), data.get("media_url"), data.get("privacy"), data.get("media_type")
+
+    # get media type
+    if not media_type:
+        ext = os.path.splitext(media)[1].lower().lstrip('.')
+        if ext in ('mp4','mov','webm'):
+            media_type = 'video'
+        else:
+            media_type = 'image'
+
     # Connect to DB
     connection = get_db_connection()
     if connection is None:
@@ -887,7 +896,7 @@ def create_post():
     
     db_query = connection.cursor(dictionary=True)
     # create post query
-    db_query.execute("INSERT INTO post (user_id, content_text, media_url, privacy) VALUES (%s,%s,%s,%s)", (user_id, text, media, privacy))
+    db_query.execute("INSERT INTO post (user_id, content_text, media_url, privacy, media_type) VALUES (%s,%s,%s,%s,%s)", (user_id, text, media, privacy, media_type))
     connection.commit(); db_query.close(); connection.close()
     return jsonify({"message": "Post created successfully."})
 
@@ -937,6 +946,13 @@ def upload_media():
 
         try:
             file.save(save_path)
+
+            ext = os.path.splitext(unique_name)[1].lower().lstrip('.')
+            if ext in ('mp4','mov','webm'):
+                media_type = 'video'
+            else:
+                media_type = 'image'
+
         except PermissionError as e:
             print(f"[UPLOAD ERROR] Permission denied: {e}")
             return jsonify({
@@ -1121,6 +1137,7 @@ def api_public_posts():
               p.user_id,
               p.content_text,
               p.media_url,
+              p.media_type,
               p.privacy,
               p.created_at,
               u.user_name,
