@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Home, PlusSquare, User, Star, Crown, Bell, LogOut, Settings, Shield } from 'lucide-react';
+import { Search, Home, PlusSquare, User, Star, Crown, LogOut, Settings, Shield } from 'lucide-react';
 import { API_BASE } from './config'; 
 import CreatePostModal from './CreatePostModal';
 import RatingModal from './RatingModal';
@@ -233,7 +233,7 @@ const FeedFinder = () => {
                 <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 z-10" />
                 <input
                   type="text"
-                  placeholder="Search profiles, posts..."
+                  placeholder="Search post"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
@@ -257,10 +257,6 @@ const FeedFinder = () => {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded-full relative">
-                <Bell size={22} className="text-gray-700" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={async () => {
