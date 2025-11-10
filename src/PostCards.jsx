@@ -1,12 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Star, DollarSign, Lock, Crown, FileText } from 'lucide-react';
 import { API_BASE } from './config';
-
-// Simple URL allowlist for images to reduce risk of scriptable URLs
-// const isSafeImageUrl = (url) => {
-//   if (!url || typeof url !== 'string') return false;
-//   return /^(https?:\/\/|data:image\/(?:png|jpeg|jpg|gif|webp);|blob:|\/|\.\/)/i.test(url);
-// };
 
 const isRelativeOrTrusted = (url) =>
   /^(https?:\/\/|blob:|\/|\.\/)/i.test(url || "");
@@ -21,11 +15,38 @@ export const isSafeVideoUrl = (url = "") =>
   isRelativeOrTrusted(url) &&
   /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
 
-const avgRes = await fetch(`${API_BASE}/api/rating/${encodeURIComponent(p.user_email)}`);
-const avgData = await avgRes.json();
-const avg = avgRes.ok && avgData?.average ? Number(avgData.average) : 0;
-
 const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = false, onAuthorClick }) => {
+  const [avgRating, setAvgRating] = useState(null);
+  const [ratingCount, setRatingCount] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const email = post?.author?.email || post?.user_email;
+    if (!email) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/rating/${encodeURIComponent(email)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!mounted) return;
+        if (res.ok && data?.average != null) {
+          setAvgRating(Number(data.average));
+          setRatingCount(Number(data.count || 0));
+        } else {
+          setAvgRating(null);
+          setRatingCount(null);
+        }
+      } catch {
+        if (mounted) {
+          setAvgRating(null);
+          setRatingCount(null);
+        }
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [post?.author?.email, post?.user_email]);
+
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition mb-8 border-2 border-gray-200">
       {/* Author Header */}
@@ -66,7 +87,10 @@ const PostCards = ({ post, setShowRatingModal, isLoggedIn = false, isPremium = f
               <span className="text-gray-300">•</span>
               <div className="flex items-center gap-1">
                 <Star size={14} className="fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{post.author.rating = avg}</span>
+                <span className="font-medium">
+                  {avgRating != null ? avgRating.toFixed(2) : '—'}
+                </span>
+                {ratingCount ? <span className="text-gray-400 ml-1">({ratingCount})</span> : null}
               </div>
             </div>
           </div>
