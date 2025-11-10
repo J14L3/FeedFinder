@@ -68,6 +68,12 @@ const ProfilePage = ({
       setLoading(true);
       setError(null);
 
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        setError('Request timed out. Please try again.');
+        setLoading(false);
+      }, 15000); // 15 second timeout
+
       try {
         // Fetch profile
         const profileData = await fetchProfile(userId);
@@ -76,29 +82,51 @@ const ProfilePage = ({
           setUserProfile(profileData);
           setEditBio(profileData.bio || '');
 
-          // Fetch profile statistics and posts in parallel
-          const [statsResult, posts] = await Promise.all([
-            (async () => {
-              try {
-                const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
-                  method: 'GET',
-                });
-                if (statsResponse.ok) {
-                  const statsData = await statsResponse.json();
-                  if (statsData.stats) {
-                    return statsData.stats;
-                  }
+          // Fetch profile statistics and posts in parallel with timeout
+          const statsPromise = (async () => {
+            try {
+              const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
+                method: 'GET',
+              });
+              if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                if (statsData.stats) {
+                  return statsData.stats;
                 }
-                // Fallback to basic stats
-                return await fetchProfileStats(userId, profileData.user_email);
-              } catch (err) {
-                console.error('Error fetching stats:', err);
-                // Fallback to basic stats
-                return await fetchProfileStats(userId, profileData.user_email);
               }
-            })(),
-            fetchUserPosts(userId, currentUserId)
+              // Fallback to basic stats
+              return await fetchProfileStats(userId, profileData.user_email);
+            } catch (err) {
+              console.error('Error fetching stats:', err);
+              // Fallback to basic stats
+              return await fetchProfileStats(userId, profileData.user_email);
+            }
+          })();
+
+          const postsPromise = fetchUserPosts(userId, currentUserId);
+
+          // Use Promise.race with timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 10000)
+          );
+
+          const [statsResult, posts] = await Promise.all([
+            Promise.race([statsPromise, timeoutPromise]).catch(() => {
+              // Return default stats on timeout
+              return {
+                totalPosts: 0,
+                totalLikes: 0,
+                totalComments: 0,
+                totalRatings: 0,
+                averageRating: 0,
+                followers: 0,
+                following: 0
+              };
+            }),
+            Promise.race([postsPromise, timeoutPromise]).catch(() => [])
           ]);
+
+          clearTimeout(timeoutId);
 
           // Set stats
           setStats(statsResult);
@@ -125,11 +153,13 @@ const ProfilePage = ({
           }));
           setUserPosts(transformedPosts);
         } else {
+          clearTimeout(timeoutId);
           setError('Profile not found');
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         console.error('Error loading profile:', err);
-        setError('Failed to load profile');
+        setError(err.message || 'Failed to load profile. Please try again.');
       } finally {
         setLoading(false);
       }

@@ -1050,48 +1050,119 @@ def api_delete_post(post_id):
         db_query.close(); connection.close()
 
 # --- Post Visibility (public / friends / exclusive) ---
-# @app.route("/api/posts/user/<int:creator_id>", methods=["GET"])  # query: ?viewer=<viewer_id>
-# def api_view_creator_posts(creator_id):
-#     try:
-#         viewer_id = int(request.args.get("viewer"))
-#     except (TypeError, ValueError):
-#         return jsonify({"error": "Missing or invalid viewer id"}), 400
-#     # Connect to DB
-#     connection = get_db_connection()
-#     if connection is None:
-#         return jsonify({
-#             "success": False,
-#             "message": "Database connection failed."
-#         }), 500
+@app.route("/api/posts/user/<int:creator_id>", methods=["GET"])
+@optional_auth
+def api_view_creator_posts(creator_id):
+    """
+    Get posts by a specific creator.
+    Respects privacy settings: public, friends, exclusive (if subscribed), or own posts.
+    """
+    # Get viewer ID from authentication (optional)
+    viewer_id = getattr(request, 'user_id', None)
     
-#     db_query = connection.cursor(dictionary=True)
-#     # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
-#     # view other posts with logic implemented in sql query
-#     # works with exclusive subcription and friends posts
-#     try: 
-#         db_query.execute(
-#             """
-#             SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at
-#             FROM post p
-#             WHERE p.user_id=%s
-#               AND (
-#                 p.privacy='public'
-#                 OR (p.privacy='friends' AND EXISTS (
-#                     SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
-#                 ))
-#                 OR (p.privacy='exclusive' AND EXISTS (
-#                     SELECT 1 FROM subscription s
-#                     WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
-#                           AND NOW() BETWEEN s.start_date AND s.end_date
-#                 ))
-#               )
-#             ORDER BY p.created_at DESC
-#             """,
-#             (creator_id, viewer_id, creator_id, viewer_id, creator_id)
-#         )
-#         return jsonify(db_query.fetchall())
-#     finally:
-#         db_query.close(); connection.close()
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # If viewing own posts, show all posts
+        if viewer_id and viewer_id == creator_id:
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id,)
+            )
+        elif viewer_id:
+            # Viewing someone else's posts - respect privacy
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s
+                  AND (
+                    p.privacy = 'public'
+                    OR (p.privacy = 'friends' AND EXISTS (
+                        SELECT 1 FROM friends f 
+                        WHERE (f.user_id = %s AND f.friend_user_id = %s)
+                           OR (f.user_id = %s AND f.friend_user_id = %s)
+                    ))
+                    OR (p.privacy = 'exclusive' AND EXISTS (
+                        SELECT 1 FROM subscription s
+                        WHERE s.subscriber_id = %s 
+                          AND s.creator_id = %s 
+                          AND s.is_active = TRUE
+                          AND NOW() BETWEEN s.start_date AND s.end_date
+                    ))
+                  )
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id, viewer_id, creator_id, creator_id, viewer_id, viewer_id, creator_id)
+            )
+        else:
+            # Not authenticated - only public posts
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s AND p.privacy = 'public'
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id,)
+            )
+        
+        posts = db_query.fetchall()
+        
+        # Format response
+        results = []
+        for post in posts:
+            results.append({
+                "post_id": post['post_id'],
+                "content_text": post['content_text'],
+                "media_url": post['media_url'],
+                "privacy": post['privacy'],
+                "created_at": post['created_at'].isoformat() if post['created_at'] else None,
+                "like_count": post['like_count'] or 0
+            })
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Error fetching creator posts: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching posts"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
         
 # --- get random public posts and display ---
 @app.route("/api/posts/public", methods=["GET"])
