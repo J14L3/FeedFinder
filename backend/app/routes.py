@@ -1128,7 +1128,7 @@ def api_public_posts():
             FROM post p
             JOIN user u ON u.user_id = p.user_id
             WHERE p.privacy = 'public'
-            ORDER BY RAND()
+            ORDER BY p.created_at DESC, p.post_id DESC
             LIMIT %s
             """,
             (limit,)
