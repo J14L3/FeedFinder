@@ -17,7 +17,7 @@ const isSafeVideoUrl = (url = "") =>
   /^(https?:\/\/|blob:|\/|\.\/)/i.test(url || "") &&
   /\.(mp4|webm|mov|ogg)$/i.test(new URL(url, window.location.origin).pathname);
 
-const AdminPage = () => {
+const AdminPage = ({ onBack }) => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -140,7 +140,13 @@ const AdminPage = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600 mb-6">{error || 'Admin privileges required to access this page.'}</p>
           <button
-            onClick={() => window.history.back()}
+            onClick={() => {
+              if (onBack) {
+                onBack();
+              } else {
+                window.history.back();
+              }
+            }}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             Go Back

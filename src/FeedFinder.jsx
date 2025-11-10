@@ -402,7 +402,11 @@ const FeedFinder = () => {
         ) : activeTab === 'premium' ? (
           <PremiumUpgrade setIsPremium={setIsPremium} setActiveTab={setActiveTab} />
         ) : activeTab === 'admin' ? (
-          <AdminPage />
+          <AdminPage 
+            onBack={() => {
+              setActiveTab('home');
+            }}
+          />
         ) : activeTab === 'search' ? (
           <SearchResultsPage
             searchQuery={searchResultsQuery}
