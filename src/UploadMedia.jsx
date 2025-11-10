@@ -18,7 +18,6 @@ const UploadMedia = () => {
         const user = await verifySession();
         if (user) {
           setCurrUserId(user.id);
-          console.log('Current logged-in user ID:', user.id);
         }
       } catch (err) {
         console.error('Failed to get user ID:', err);
