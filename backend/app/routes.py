@@ -775,7 +775,7 @@ def get_profile_stats(user_id):
         """, (user_id,))
         total_comments = db_query.fetchone()['count'] or 0
         
-        # Get rating stats (1-5 scale)
+        # Get rating stats (convert from 1-10 scale to 1-5 scale)
         db_query.execute("""
             SELECT 
                 COUNT(*) as count,
@@ -783,10 +783,9 @@ def get_profile_stats(user_id):
             FROM rating
             WHERE creator_email = (SELECT user_email FROM user WHERE user_id = %s)
         """, (user_id,))
-        
         rating_result = db_query.fetchone()
         total_ratings = rating_result['count'] or 0
-        avg_rating = float(rating_result['average']) if rating_result['average'] else 0
+        avg_rating = (float(rating_result['average']) / 2.0) if rating_result['average'] else 0
         avg_rating = round(avg_rating, 1) if avg_rating > 0 else 0
         
         # Get followers count (users who have this user as a friend)
