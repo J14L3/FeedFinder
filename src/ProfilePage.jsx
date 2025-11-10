@@ -17,7 +17,8 @@ const ProfilePage = ({
   isPremium = false,
   currentUserId: propCurrentUserId = null,
   setShowRatingModal,
-  onBack
+  onBack,
+  onNavigateToSettings
 }) => {
   const [activeView, setActiveView] = useState('posts'); // posts, about, stats
   const [isEditing, setIsEditing] = useState(false);
@@ -388,7 +389,11 @@ const ProfilePage = ({
                     <div className="flex gap-3">
                       {isOwnProfile && (
                         <button
-                          onClick={() => {/* Navigate to settings */ }}
+                          onClick={() => {
+                            if (onNavigateToSettings) {
+                              onNavigateToSettings();
+                            }
+                          }}
                           className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-medium transition flex items-center gap-2"
                         >
                           <Settings size={18} />

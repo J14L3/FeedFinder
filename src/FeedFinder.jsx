@@ -442,6 +442,9 @@ const FeedFinder = () => {
                  setViewingProfile(null);
                  setActiveTab('home');
                }}
+               onNavigateToSettings={() => {
+                 setActiveTab('settings');
+               }}
              />
            ) : (
              <div className="text-center py-12">
