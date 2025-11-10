@@ -255,9 +255,7 @@ const FeedFinder = () => {
                     </button>
                      <button 
                        onClick={() => {
-                         if (currentUserId) {
-                           setViewingProfile({ user_id: currentUserId });
-                         }
+                         setViewingProfile(null);
                          setActiveTab('profile');
                          setShowUserMenu(false);
                        }}
@@ -444,9 +442,7 @@ const FeedFinder = () => {
           </button>
           <button
             onClick={() => {
-              if (currentUserId) {
-                setViewingProfile({ user_id: currentUserId });
-              }
+              setViewingProfile(null);
               setActiveTab('profile');
             }}
             className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-600'}`}
