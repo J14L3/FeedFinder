@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Star, Crown, MapPin, Calendar, Edit2, Camera, Heart, 
+import {
+  Star, Crown, MapPin, Calendar, Edit2, Camera, Heart,
   MessageCircle, Share2, Grid, List, Settings, DollarSign,
   Users, Award, TrendingUp
 } from 'lucide-react';
@@ -10,7 +10,7 @@ import { fetchProfile, fetchUserPosts, fetchProfileStats, updateProfile } from '
 import { authenticatedFetch } from './authService';
 import { API_BASE } from './config';
 
-const ProfilePage = ({ 
+const ProfilePage = ({
   userId = null,
   isOwnProfile = false,
   isLoggedIn = false,
@@ -46,7 +46,7 @@ const ProfilePage = ({
       setCurrentUserId(propCurrentUserId);
       return;
     }
-    
+
     const getCurrentUserId = async () => {
       try {
         const { verifySession } = await import('./authService');
@@ -113,7 +113,7 @@ const ProfilePage = ({
           console.log('ProfilePage: Fetching posts with userId:', userId, 'currentUserId:', currentUserId);
 
           // Use Promise.race with timeout to prevent hanging
-          const timeoutPromise = new Promise((_, reject) => 
+          const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Request timeout')), 10000)
           );
 
@@ -151,6 +151,7 @@ const ProfilePage = ({
               user_id: userId,
               name: profileData.user_name,
               username: `@${profileData.user_name}`,
+              email: profileData.user_email,
               avatar: profileData.profile_picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.user_name}`,
               rating: parseFloat(statsResult.averageRating) || 0,
               verified: false,
@@ -164,7 +165,7 @@ const ProfilePage = ({
             comments: 0,
             isExclusive: post.privacy === 'exclusive'
           })) : [];
-          
+
           console.log('ProfilePage: Transformed posts count:', transformedPosts.length);
           setUserPosts(transformedPosts);
         } else {
@@ -193,7 +194,7 @@ const ProfilePage = ({
     const date = new Date(timestamp);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
@@ -259,7 +260,7 @@ const ProfilePage = ({
           <div className="absolute inset-0 bg-black bg-opacity-10"></div>
           {isOwnProfile && (
             <button
-              onClick={() => {/* Open banner upload */}}
+              onClick={() => {/* Open banner upload */ }}
               className="absolute top-4 right-4 p-2 bg-white bg-opacity-90 rounded-full hover:bg-opacity-100 transition shadow-lg"
             >
               <Camera size={20} className="text-gray-700" />
@@ -294,7 +295,7 @@ const ProfilePage = ({
                     )}
                     {isOwnProfile && (
                       <button
-                        onClick={() => {/* Open avatar upload */}}
+                        onClick={() => {/* Open avatar upload */ }}
                         className="absolute bottom-0 right-0 p-2 bg-blue-500 rounded-full shadow-lg hover:bg-blue-600 transition"
                       >
                         <Camera size={16} className="text-white" />
@@ -317,7 +318,7 @@ const ProfilePage = ({
                         )}
                       </div>
                       <p className="text-gray-500 mt-1">@{userProfile.user_name}</p>
-                      
+
                       {/* Rating */}
                       <div className="flex items-center gap-2 mt-2">
                         <div className="flex items-center gap-1">
@@ -385,24 +386,14 @@ const ProfilePage = ({
 
                     {/* Action Buttons */}
                     <div className="flex gap-3">
-                      {isOwnProfile ? (
+                      {isOwnProfile && (
                         <button
-                          onClick={() => {/* Navigate to settings */}}
+                          onClick={() => {/* Navigate to settings */ }}
                           className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full font-medium transition flex items-center gap-2"
                         >
                           <Settings size={18} />
                           Edit Profile
                         </button>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => setShowRatingModal({ author: userProfile })}
-                            className="px-6 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-full font-medium transition flex items-center gap-2"
-                          >
-                            <Star size={18} />
-                            Rate
-                          </button>
-                        </>
                       )}
                     </div>
                   </div>
@@ -439,11 +430,10 @@ const ProfilePage = ({
           <div className="flex gap-2">
             <button
               onClick={() => setActiveView('posts')}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
-                activeView === 'posts'
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${activeView === 'posts'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <Grid size={18} />
@@ -452,21 +442,19 @@ const ProfilePage = ({
             </button>
             <button
               onClick={() => setActiveView('about')}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
-                activeView === 'about'
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${activeView === 'about'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               About
             </button>
             <button
               onClick={() => setActiveView('stats')}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
-                activeView === 'stats'
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${activeView === 'stats'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <TrendingUp size={18} />
@@ -493,7 +481,7 @@ const ProfilePage = ({
                   <PostCards
                     key={post.id}
                     post={post}
-                    currentUserId={currentUserId} 
+                    currentUserId={currentUserId}
                     setShowRatingModal={setShowRatingModal}
                     isLoggedIn={isLoggedIn}
                     isPremium={isPremium}
