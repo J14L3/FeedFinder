@@ -12,8 +12,8 @@ if exist venv\Scripts\activate.bat (
 REM Install test dependencies if needed
 pip install -q -r requirements.txt
 
-REM Run pytest with coverage
-pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
+REM Run pytest with coverage using Python module syntax
+python -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
 
 echo.
 echo Test coverage report generated in htmlcov\index.html

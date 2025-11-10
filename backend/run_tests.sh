@@ -13,7 +13,7 @@ fi
 pip install -q -r requirements.txt
 
 # Run pytest with coverage
-pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
+~/backend/FeedFinder/backend/venv/bin/python3.12 -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html
 
 echo ""
 echo "Test coverage report generated in htmlcov/index.html"
