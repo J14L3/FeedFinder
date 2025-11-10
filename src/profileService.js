@@ -10,20 +10,33 @@ import { API_BASE } from './config';
  * Fetch user profile by user_id
  */
 export async function fetchProfile(userId) {
+  if (!userId) {
+    console.error('fetchProfile: userId is required');
+    return null;
+  }
+
   try {
+    console.log('fetchProfile: Fetching profile for userId:', userId);
     const response = await authenticatedFetch(`${API_BASE}/api/profile/${userId}`, {
       method: 'GET',
     });
 
+    console.log('fetchProfile: Response status:', response.status);
+
     if (response.ok) {
       const data = await response.json();
+      console.log('fetchProfile: Profile data received:', data ? 'Success' : 'Null');
       return data;
     } else if (response.status === 404) {
+      console.log('fetchProfile: Profile not found (404)');
       return null;
     }
-    throw new Error('Failed to fetch profile');
+    
+    const errorText = await response.text().catch(() => 'Unknown error');
+    console.error('fetchProfile: Error response:', response.status, errorText);
+    throw new Error(`Failed to fetch profile: ${response.status}`);
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('fetchProfile: Exception caught:', error);
     return null;
   }
 }
@@ -58,25 +71,45 @@ export async function fetchCurrentUserProfile() {
 
 /**
  * Fetch user's posts for profile page
+ * The backend endpoint uses optional_auth, so viewerId is determined from the session token
  */
 export async function fetchUserPosts(userId, viewerId = null) {
+  if (!userId) {
+    console.error('fetchUserPosts: userId is required');
+    return [];
+  }
+
   try {
-    let url = `${API_BASE}/api/posts/user/${userId}`;
-    if (viewerId) {
-      url += `?viewer=${viewerId}`;
-    }
+    const url = `${API_BASE}/api/posts/user/${userId}`;
+    console.log('fetchUserPosts: Fetching posts for userId:', userId, 'viewerId:', viewerId);
 
     const response = await authenticatedFetch(url, {
       method: 'GET',
     });
 
+    console.log('fetchUserPosts: Response status:', response.status);
+
     if (response.ok) {
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      console.log('fetchUserPosts: Received data:', data);
+      console.log('fetchUserPosts: Is array?', Array.isArray(data), 'Length:', Array.isArray(data) ? data.length : 'N/A');
+      
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.items)) {
+        // Handle case where response might be wrapped
+        return data.items;
+      } else {
+        console.warn('fetchUserPosts: Unexpected response format:', data);
+        return [];
+      }
+    } else {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('fetchUserPosts: Error response:', response.status, errorText);
     }
     return [];
   } catch (error) {
-    console.error('Error fetching user posts:', error);
+    console.error('fetchUserPosts: Exception caught:', error);
     return [];
   }
 }

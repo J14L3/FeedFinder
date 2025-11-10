@@ -705,6 +705,103 @@ def get_profile_by_email():
         return jsonify(profile)
     return jsonify({"error": "User not found"}), 404
 
+@app.route("/api/profile/<int:user_id>/stats", methods=["GET"])
+@optional_auth
+def get_profile_stats(user_id):
+    """
+    Get profile statistics for a user.
+    Returns post count, likes, comments, ratings, followers, following, etc.
+    """
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # Get post count
+        db_query.execute("SELECT COUNT(*) as count FROM post WHERE user_id = %s", (user_id,))
+        post_count = db_query.fetchone()['count'] or 0
+        
+        # Get total likes (sum of all likes on user's posts)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM post_like pl
+            JOIN post p ON pl.post_id = p.post_id
+            WHERE p.user_id = %s
+        """, (user_id,))
+        total_likes = db_query.fetchone()['count'] or 0
+        
+        # Get total comments
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM comment c
+            JOIN post p ON c.post_id = p.post_id
+            WHERE p.user_id = %s
+        """, (user_id,))
+        total_comments = db_query.fetchone()['count'] or 0
+        
+        # Get rating stats (convert from 1-10 scale to 1-5 scale)
+        db_query.execute("""
+            SELECT 
+                COUNT(*) as count,
+                AVG(rating_value) as average
+            FROM rating
+            WHERE creator_email = (SELECT user_email FROM user WHERE user_id = %s)
+        """, (user_id,))
+        rating_result = db_query.fetchone()
+        total_ratings = rating_result['count'] or 0
+        avg_rating = (float(rating_result['average']) / 2.0) if rating_result['average'] else 0
+        avg_rating = round(avg_rating, 1) if avg_rating > 0 else 0
+        
+        # Get followers count (users who have this user as a friend)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM friends 
+            WHERE friend_user_id = %s
+        """, (user_id,))
+        followers = db_query.fetchone()['count'] or 0
+        
+        # Get following count (users this user has as friends)
+        db_query.execute("""
+            SELECT COUNT(*) as count 
+            FROM friends 
+            WHERE user_id = %s
+        """, (user_id,))
+        following = db_query.fetchone()['count'] or 0
+        
+        stats = {
+            "totalPosts": post_count,
+            "totalLikes": total_likes,
+            "totalComments": total_comments,
+            "totalRatings": total_ratings,
+            "averageRating": avg_rating,
+            "followers": followers,
+            "following": following,
+            "totalDonations": 0,  # Placeholder - implement if you have donations table
+            "monthlyDonations": 0,  # Placeholder
+            "topDonation": 0  # Placeholder
+        }
+        
+        return jsonify({
+            "success": True,
+            "stats": stats
+        }), 200
+        
+    except Exception as e:
+        print(f"Error fetching profile stats: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching profile statistics"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
+
 @app.route("/api/profile/update", methods=["PUT", "OPTIONS"])
 @require_auth
 def update_profile():
@@ -994,6 +1091,133 @@ def upload_media():
 def serve_upload(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
+# --- Post Visibility (public / friends / exclusive) ---
+# IMPORTANT: This route must come BEFORE /api/posts/<int:user_id> to avoid route conflicts
+# Flask matches routes in order, and more specific routes should come first
+@app.route("/api/posts/user/<int:creator_id>", methods=["GET"])
+@optional_auth
+def api_view_creator_posts(creator_id):
+    """
+    Get posts by a specific creator.
+    Respects privacy settings: public, friends, exclusive (if subscribed), or own posts.
+    """
+    # Get viewer ID from authentication (optional)
+    viewer_id = getattr(request, 'user_id', None)
+    
+    # Debug logging
+    print(f"api_view_creator_posts: creator_id={creator_id}, viewer_id={viewer_id}, is_own_profile={viewer_id == creator_id if viewer_id else False}")
+    
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # If viewing own posts, show all posts
+        if viewer_id and viewer_id == creator_id:
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id,)
+            )
+        elif viewer_id:
+            # Viewing someone else's posts - respect privacy
+            # Show: public posts, friends posts (if friendship exists), exclusive posts (if subscribed)
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s
+                  AND (
+                    p.privacy = 'public'
+                    OR (p.privacy = 'friends' AND EXISTS (
+                        SELECT 1 FROM friends f 
+                        WHERE (f.user_id = %s AND f.friend_user_id = %s)
+                           OR (f.user_id = %s AND f.friend_user_id = %s)
+                    ))
+                    OR (p.privacy = 'exclusive' AND EXISTS (
+                        SELECT 1 FROM subscription s
+                        WHERE s.subscriber_id = %s 
+                          AND s.creator_id = %s 
+                          AND s.is_active = TRUE
+                          AND NOW() BETWEEN s.start_date AND s.end_date
+                    ))
+                  )
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id, viewer_id, creator_id, creator_id, viewer_id, viewer_id, creator_id)
+            )
+            
+            # Log for debugging
+            print(f"Fetching posts for creator_id={creator_id}, viewer_id={viewer_id}")
+            posts_fetched = db_query.fetchall()
+            print(f"Found {len(posts_fetched)} posts")
+            posts = posts_fetched
+        else:
+            # Not authenticated - only public posts
+            db_query.execute(
+                """
+                SELECT 
+                    p.post_id, 
+                    p.content_text, 
+                    p.media_url, 
+                    p.privacy, 
+                    p.created_at,
+                    (SELECT COUNT(*) FROM post_like pl WHERE pl.post_id = p.post_id) as like_count
+                FROM post p
+                WHERE p.user_id = %s AND p.privacy = 'public'
+                ORDER BY p.created_at DESC
+                """,
+                (creator_id,)
+            )
+            
+            posts = db_query.fetchall()
+        
+        # Format response
+        results = []
+        for post in posts:
+            results.append({
+                "post_id": post['post_id'],
+                "content_text": post['content_text'],
+                "media_url": post['media_url'],
+                "privacy": post['privacy'],
+                "created_at": post['created_at'].isoformat() if post['created_at'] else None,
+                "like_count": post['like_count'] or 0
+            })
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Error fetching creator posts: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching posts"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
+
 @app.route("/api/posts/<int:user_id>", methods=["GET"])
 def get_user_posts(user_id):
     # Connect to DB
@@ -1064,50 +1288,6 @@ def api_delete_post(post_id):
         return jsonify({"message": "Post deleted."})
     finally:
         db_query.close(); connection.close()
-
-# --- Post Visibility (public / friends / exclusive) ---
-# @app.route("/api/posts/user/<int:creator_id>", methods=["GET"])  # query: ?viewer=<viewer_id>
-# def api_view_creator_posts(creator_id):
-#     try:
-#         viewer_id = int(request.args.get("viewer"))
-#     except (TypeError, ValueError):
-#         return jsonify({"error": "Missing or invalid viewer id"}), 400
-#     # Connect to DB
-#     connection = get_db_connection()
-#     if connection is None:
-#         return jsonify({
-#             "success": False,
-#             "message": "Database connection failed."
-#         }), 500
-    
-#     db_query = connection.cursor(dictionary=True)
-#     # visibility rule: public OR (friends & friendship exists) OR (exclusive & subscription exists)
-#     # view other posts with logic implemented in sql query
-#     # works with exclusive subcription and friends posts
-#     try: 
-#         db_query.execute(
-#             """
-#             SELECT p.post_id, p.content_text, p.media_url, p.privacy, p.created_at
-#             FROM post p
-#             WHERE p.user_id=%s
-#               AND (
-#                 p.privacy='public'
-#                 OR (p.privacy='friends' AND EXISTS (
-#                     SELECT 1 FROM friends WHERE user_id=%s AND friend_user_id=%s
-#                 ))
-#                 OR (p.privacy='exclusive' AND EXISTS (
-#                     SELECT 1 FROM subscription s
-#                     WHERE s.subscriber_id=%s AND s.creator_id=%s AND s.is_active=TRUE
-#                           AND NOW() BETWEEN s.start_date AND s.end_date
-#                 ))
-#               )
-#             ORDER BY p.created_at DESC
-#             """,
-#             (creator_id, viewer_id, creator_id, viewer_id, creator_id)
-#         )
-#         return jsonify(db_query.fetchall())
-#     finally:
-#         db_query.close(); connection.close()
         
 # --- get random public posts and display ---
 @app.route("/api/posts/public", methods=["GET"])
@@ -1233,7 +1413,59 @@ def view_rating(email):
     return jsonify({"message": "No ratings yet."})
 
 # --- Friendship Management ---
-# @app.route("/api/friends/<int:user_id>", methods=["GET"])
+@app.route("/api/friends/<int:user_id>", methods=["GET"])
+@optional_auth
+def get_user_friends(user_id):
+    """
+    Get list of friends for a user.
+    Returns array of friend user objects.
+    """
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # Get friends (users who have this user as a friend, or users this user has as friends)
+        # Friends are bidirectional, so we check both directions
+        db_query.execute("""
+            SELECT DISTINCT u.user_id, u.user_name, u.user_email, u.profile_picture
+            FROM friends f
+            JOIN user u ON (
+                (f.user_id = %s AND u.user_id = f.friend_user_id)
+                OR (f.friend_user_id = %s AND u.user_id = f.user_id)
+            )
+            WHERE u.user_id != %s
+        """, (user_id, user_id, user_id))
+        
+        friends = db_query.fetchall()
+        
+        # Format response
+        results = []
+        for friend in friends:
+            results.append({
+                "user_id": friend['user_id'],
+                "user_name": friend['user_name'],
+                "user_email": friend['user_email'],
+                "profile_picture": friend['profile_picture'] or f"https://api.dicebear.com/7.x/avataaars/svg?seed={friend['user_name']}"
+            })
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Error fetching friends: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching friends"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
 # def get_friends(user_id):
 #     # Connect to DB
 #     connection = get_db_connection()

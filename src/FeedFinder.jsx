@@ -358,6 +358,7 @@ const FeedFinder = () => {
                isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
                isLoggedIn={isLoggedIn}
                isPremium={isPremium}
+               currentUserId={currentUserId}
                setShowRatingModal={setShowRatingModal}
                onBack={() => {
                  setViewingProfile(null);

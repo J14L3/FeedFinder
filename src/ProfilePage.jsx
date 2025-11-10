@@ -15,6 +15,7 @@ const ProfilePage = ({
   isOwnProfile = false,
   isLoggedIn = false,
   isPremium = false,
+  currentUserId: propCurrentUserId = null,
   setShowRatingModal,
   onBack
 }) => {
@@ -37,10 +38,15 @@ const ProfilePage = ({
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(propCurrentUserId);
 
-  // Get current user ID
+  // Get current user ID if not provided as prop
   useEffect(() => {
+    if (propCurrentUserId) {
+      setCurrentUserId(propCurrentUserId);
+      return;
+    }
+    
     const getCurrentUserId = async () => {
       try {
         const { verifySession } = await import('./authService');
@@ -53,7 +59,7 @@ const ProfilePage = ({
       }
     };
     getCurrentUserId();
-  }, []);
+  }, [propCurrentUserId]);
 
   // Fetch profile data from database
   useEffect(() => {
@@ -66,6 +72,12 @@ const ProfilePage = ({
       setLoading(true);
       setError(null);
 
+      // Add timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        setError('Request timed out. Please try again.');
+        setLoading(false);
+      }, 15000); // 15 second timeout
+
       try {
         // Fetch profile
         const profileData = await fetchProfile(userId);
@@ -74,35 +86,66 @@ const ProfilePage = ({
           setUserProfile(profileData);
           setEditBio(profileData.bio || '');
 
-          // Fetch profile statistics and posts in parallel
-          const [statsResult, posts] = await Promise.all([
-            (async () => {
-              try {
-                const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
-                  method: 'GET',
-                });
-                if (statsResponse.ok) {
-                  const statsData = await statsResponse.json();
-                  if (statsData.stats) {
-                    return statsData.stats;
-                  }
+          // Fetch profile statistics and posts in parallel with timeout
+          const statsPromise = (async () => {
+            try {
+              const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
+                method: 'GET',
+              });
+              if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                if (statsData.stats) {
+                  return statsData.stats;
                 }
-                // Fallback to basic stats
-                return await fetchProfileStats(userId, profileData.user_email);
-              } catch (err) {
-                console.error('Error fetching stats:', err);
-                // Fallback to basic stats
-                return await fetchProfileStats(userId, profileData.user_email);
               }
-            })(),
-            fetchUserPosts(userId, currentUserId)
+              // Fallback to basic stats
+              return await fetchProfileStats(userId, profileData.user_email);
+            } catch (err) {
+              console.error('Error fetching stats:', err);
+              // Fallback to basic stats
+              return await fetchProfileStats(userId, profileData.user_email);
+            }
+          })();
+
+          // Fetch posts - currentUserId is used by backend to determine if viewing own posts
+          // If currentUserId is null, backend will only return public posts
+          const postsPromise = fetchUserPosts(userId, currentUserId);
+          console.log('ProfilePage: Fetching posts with userId:', userId, 'currentUserId:', currentUserId);
+
+          // Use Promise.race with timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), 10000)
+          );
+
+          const [statsResult, posts] = await Promise.all([
+            Promise.race([statsPromise, timeoutPromise]).catch(() => {
+              // Return default stats on timeout
+              return {
+                totalPosts: 0,
+                totalLikes: 0,
+                totalComments: 0,
+                totalRatings: 0,
+                averageRating: 0,
+                followers: 0,
+                following: 0
+              };
+            }),
+            Promise.race([postsPromise, timeoutPromise]).catch((err) => {
+              console.error('Error fetching posts (timeout or error):', err);
+              return [];
+            })
           ]);
+
+          clearTimeout(timeoutId);
+
+          console.log('ProfilePage: Posts received:', posts);
+          console.log('ProfilePage: Posts count:', Array.isArray(posts) ? posts.length : 'Not an array');
 
           // Set stats
           setStats(statsResult);
 
           // Transform posts to match PostCards format
-          const transformedPosts = posts.map(post => ({
+          const transformedPosts = Array.isArray(posts) ? posts.map(post => ({
             id: post.post_id,
             author: {
               user_id: userId,
@@ -120,14 +163,18 @@ const ProfilePage = ({
             likes: post.like_count || 0,
             comments: 0,
             isExclusive: post.privacy === 'exclusive'
-          }));
+          })) : [];
+          
+          console.log('ProfilePage: Transformed posts count:', transformedPosts.length);
           setUserPosts(transformedPosts);
         } else {
+          clearTimeout(timeoutId);
           setError('Profile not found');
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         console.error('Error loading profile:', err);
-        setError('Failed to load profile');
+        setError(err.message || 'Failed to load profile. Please try again.');
       } finally {
         setLoading(false);
       }
