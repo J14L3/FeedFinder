@@ -90,15 +90,6 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
       {post.type === 'video' && !post.isExclusive && (
         <div className="relative w-full aspect-square bg-gray-900">
           {isSafeVideoUrl(post.content) ? (
-            // <img
-            //   src={post.content}
-            //   alt="Video thumbnail"
-            //   className="w-full h-full object-cover"
-            //   loading="lazy"
-            //   decoding="async"
-            //   referrerPolicy="no-referrer"
-            //   crossOrigin="anonymous"
-            // />
             <video
               src={post.content}
               controls
@@ -111,11 +102,6 @@ const PostCards = ({ post, setShowRatingModal, setShowDonateModal, isLoggedIn = 
               Video unavailable
             </div>
           )}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
-              <div className="w-0 h-0 border-t-8 border-t-transparent border-l-12 border-l-gray-900 border-b-8 border-b-transparent ml-1"></div>
-            </div>
-          </div>
         </div>
       )}
       {post.type === 'text' && (
