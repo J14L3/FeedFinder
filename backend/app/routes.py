@@ -1413,7 +1413,59 @@ def view_rating(email):
     return jsonify({"message": "No ratings yet."})
 
 # --- Friendship Management ---
-# @app.route("/api/friends/<int:user_id>", methods=["GET"])
+@app.route("/api/friends/<int:user_id>", methods=["GET"])
+@optional_auth
+def get_user_friends(user_id):
+    """
+    Get list of friends for a user.
+    Returns array of friend user objects.
+    """
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+    
+    try:
+        db_query = connection.cursor(dictionary=True)
+        
+        # Get friends (users who have this user as a friend, or users this user has as friends)
+        # Friends are bidirectional, so we check both directions
+        db_query.execute("""
+            SELECT DISTINCT u.user_id, u.user_name, u.user_email, u.profile_picture
+            FROM friends f
+            JOIN user u ON (
+                (f.user_id = %s AND u.user_id = f.friend_user_id)
+                OR (f.friend_user_id = %s AND u.user_id = f.user_id)
+            )
+            WHERE u.user_id != %s
+        """, (user_id, user_id, user_id))
+        
+        friends = db_query.fetchall()
+        
+        # Format response
+        results = []
+        for friend in friends:
+            results.append({
+                "user_id": friend['user_id'],
+                "user_name": friend['user_name'],
+                "user_email": friend['user_email'],
+                "profile_picture": friend['profile_picture'] or f"https://api.dicebear.com/7.x/avataaars/svg?seed={friend['user_name']}"
+            })
+        
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Error fetching friends: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error fetching friends"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
 # def get_friends(user_id):
 #     # Connect to DB
 #     connection = get_db_connection()
