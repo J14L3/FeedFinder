@@ -279,7 +279,7 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {!isPremium && (
+                    {/* {!isPremium && (
                       <button
                         onClick={() => {
                           setActiveTab('premium');
@@ -290,7 +290,7 @@ const FeedFinder = () => {
                         <Crown size={18} />
                         Upgrade to Premium
                       </button>
-                    )}
+                    )} */}
                     <hr className="my-2" />
                     <button
                       onClick={async () => {
