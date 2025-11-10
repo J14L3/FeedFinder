@@ -889,24 +889,29 @@ def update_profile():
                 "message": "Bio is too long (max 500 characters)"
             }), 400
     
-    # Extract and validate profile picture
-    profile_picture = data.get("profile_picture")
-    if profile_picture is not None:
-        profile_picture = profile_picture.strip()
-        # If empty string, set to default avatar
-        if not profile_picture:
-            profile_picture = 'https://api.dicebear.com/7.x/avataaars/svg?seed=User'
-        # Validate profile picture is a URL
-        elif not (profile_picture.startswith('http://') or profile_picture.startswith('https://')):
+    # Extract and validate is_private
+    is_private = data.get("is_private")
+    if is_private is not None:
+        # Convert to integer (0 or 1) for database
+        if isinstance(is_private, bool):
+            is_private = 1 if is_private else 0
+        elif isinstance(is_private, (int, str)):
+            try:
+                is_private = int(is_private)
+                if is_private not in (0, 1):
+                    return jsonify({
+                        "success": False,
+                        "message": "is_private must be 0 or 1"
+                    }), 400
+            except (ValueError, TypeError):
+                return jsonify({
+                    "success": False,
+                    "message": "Invalid is_private value"
+                }), 400
+        else:
             return jsonify({
                 "success": False,
-                "message": "Profile picture must be a valid URL"
-            }), 400
-        # Validate URL length
-        if len(profile_picture) > 500:
-            return jsonify({
-                "success": False,
-                "message": "Profile picture URL is too long"
+                "message": "Invalid is_private value"
             }), 400
     
     # Connect to DB
@@ -945,9 +950,9 @@ def update_profile():
             update_fields.append("bio = %s")
             update_values.append(bio)
         
-        if profile_picture is not None:
-            update_fields.append("profile_picture = %s")
-            update_values.append(profile_picture)
+        if is_private is not None:
+            update_fields.append("is_private = %s")
+            update_values.append(is_private)
         
         # If no fields to update, return error
         if not update_fields:

@@ -1,32 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Mail, User, Save, CheckCircle, AlertCircle } from 'lucide-react';
+import { Settings, Mail, User, Save, CheckCircle, AlertCircle, Lock, Unlock } from 'lucide-react';
 import { fetchCurrentUserProfile, updateProfile } from './profileService';
 import { verifySession } from './authService';
 
 const SettingsPage = () => {
   const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
-  const [profilePicture, setProfilePicture] = useState('https://api.dicebear.com/7.x/avataaars/svg?seed=User');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // 'success' or 'error'
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-
-  // Predefined profile picture options
-  const profilePictureOptions = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=User',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Emma',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=David',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Lisa',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Anna',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Tom',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria',
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Chris'
-  ];
 
   // Fetch current user profile on mount
   useEffect(() => {
@@ -39,7 +23,7 @@ const SettingsPage = () => {
         if (profile) {
           setEmail(profile.user_email || '');
           setBio(profile.bio || '');
-          setProfilePicture(profile.profile_picture || 'https://api.dicebear.com/7.x/avataaars/svg?seed=User');
+          setIsPrivate(profile.is_private === 1 || profile.is_private === true);
         } else {
           // Check if user is authenticated
           const user = await verifySession();
@@ -67,18 +51,6 @@ const SettingsPage = () => {
     return emailRegex.test(email);
   };
 
-  const validateProfilePicture = (url) => {
-    if (!url || url.trim() === '') {
-      return 'Profile picture URL is required';
-    }
-    try {
-      new URL(url);
-      return null;
-    } catch {
-      return 'Please enter a valid URL';
-    }
-  };
-
   const validateForm = () => {
     const newErrors = {};
     const trimmedEmail = email.trim();
@@ -96,12 +68,6 @@ const SettingsPage = () => {
     // Bio validation
     if (trimmedBio.length > 500) {
       newErrors.bio = 'Bio must be less than 500 characters';
-    }
-
-    // Profile picture validation
-    const pictureError = validateProfilePicture(profilePicture);
-    if (pictureError) {
-      newErrors.profilePicture = pictureError;
     }
 
     setFieldErrors(newErrors);
@@ -126,7 +92,7 @@ const SettingsPage = () => {
       const updateData = {
         user_email: email.trim(),
         bio: bio.trim(),
-        profile_picture: profilePicture.trim()
+        is_private: isPrivate
       };
 
       const result = await updateProfile(updateData);
@@ -193,54 +159,40 @@ const SettingsPage = () => {
           <p className="text-gray-600">Manage your account information and preferences</p>
         </div>
 
-        {/* Profile Picture Section */}
+        {/* Privacy Section */}
         <div className="mb-8 pb-8 border-b border-gray-200">
           <label className="block text-sm font-medium text-gray-700 mb-4">
-            Profile Picture
+            Privacy Settings
           </label>
-          <div className="flex items-start gap-6 mb-6">
-            <div className="relative">
-              <img
-                src={profilePicture}
-                alt="Profile"
-                className="w-24 h-24 rounded-full object-cover border-4 border-blue-500"
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-3">
+              {isPrivate ? (
+                <Lock size={20} className="text-gray-600" />
+              ) : (
+                <Unlock size={20} className="text-gray-600" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-gray-900">Private Profile</p>
+                <p className="text-xs text-gray-500">
+                  {isPrivate 
+                    ? 'Your profile is private. Only approved followers can see your posts.'
+                    : 'Your profile is public. Anyone can see your posts.'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPrivate(!isPrivate)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                isPrivate ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isPrivate ? 'translate-x-6' : 'translate-x-1'
+                }`}
               />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-600 mb-2">Current profile picture</p>
-              <p className="text-xs text-gray-500">
-                Select a new profile picture from the options below
-              </p>
-            </div>
-          </div>
-          
-          {/* Profile Picture Selection Grid */}
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-3">Choose a profile picture:</p>
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-4">
-              {profilePictureOptions.map((avatar, index) => (
-                <button
-                  key={index}
-                  onClick={() => setProfilePicture(avatar)}
-                  className={`relative w-16 h-16 rounded-full overflow-hidden border-2 transition-all hover:scale-110 ${
-                    profilePicture === avatar
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
-                  <img
-                    src={avatar}
-                    alt={`Avatar ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {profilePicture === avatar && (
-                    <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
-                      <CheckCircle size={20} className="text-blue-600" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
+            </button>
           </div>
         </div>
 
@@ -363,7 +315,8 @@ const SettingsPage = () => {
               <p className="font-medium mb-1">Privacy & Security</p>
               <ul className="list-disc list-inside space-y-1 text-blue-700">
                 <li>Your email will be kept private and secure</li>
-                <li>Profile picture and bio are visible to other users</li>
+                <li>Bio is visible to other users</li>
+                <li>Private profiles restrict who can see your posts</li>
                 <li>You can update your information at any time</li>
               </ul>
             </div>
