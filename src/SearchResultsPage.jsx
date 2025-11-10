@@ -9,6 +9,45 @@ const inferMediaType = (url = "") => {
   return "image";
 };
 
+/**
+ * Sanitize search query on frontend to prevent XSS.
+ * Note: SQL injection is prevented by backend parameterized queries.
+ * Focus on XSS prevention while allowing common punctuation.
+ */
+const sanitizeSearchInput = (input) => {
+  if (!input) return "";
+  
+  // Remove HTML/script tags to prevent XSS
+  let sanitized = input.replace(/<[^>]*>/g, '');
+  
+  // Remove null bytes and control characters (except spaces, newlines, tabs)
+  sanitized = sanitized.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+  
+  // Trim and limit length
+  sanitized = sanitized.trim();
+  
+  // Limit to 200 characters
+  if (sanitized.length > 200) {
+    sanitized = sanitized.substring(0, 200);
+  }
+  
+  return sanitized;
+};
+
+/**
+ * Escape HTML entities for safe display
+ */
+const escapeHtml = (text) => {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, m => map[m]);
+};
+
 const SearchResultsPage = ({ searchQuery, onBack, isLoggedIn, isPremium, currentUserId, setShowRatingModal, onAuthorClick }) => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +55,15 @@ const SearchResultsPage = ({ searchQuery, onBack, isLoggedIn, isPremium, current
 
   useEffect(() => {
     if (searchQuery && searchQuery.trim()) {
-      fetchSearchResults(searchQuery.trim());
+      // Sanitize the query before using it
+      const sanitized = sanitizeSearchInput(searchQuery.trim());
+      if (sanitized) {
+        fetchSearchResults(sanitized);
+      } else {
+        setError('Invalid search query. Please use only letters, numbers, and common punctuation.');
+        setPosts([]);
+        setLoading(false);
+      }
     } else {
       setPosts([]);
       setLoading(false);
@@ -27,8 +74,16 @@ const SearchResultsPage = ({ searchQuery, onBack, isLoggedIn, isPremium, current
     setLoading(true);
     setError(null);
     
+    // Sanitize query before sending to backend
+    const sanitizedQuery = sanitizeSearchInput(query);
+    if (!sanitizedQuery) {
+      setError('Invalid search query. Please use only letters, numbers, and common punctuation.');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const response = await fetch(`${API_BASE}/api/posts/search?q=${encodeURIComponent(query)}&limit=100`);
+      const response = await fetch(`${API_BASE}/api/posts/search?q=${encodeURIComponent(sanitizedQuery)}&limit=100`);
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -99,7 +154,7 @@ const SearchResultsPage = ({ searchQuery, onBack, isLoggedIn, isPremium, current
               <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
               {searchQuery && (
                 <p className="text-sm text-gray-500">
-                  Results for: <span className="font-medium text-gray-700">"{searchQuery}"</span>
+                  Results for: <span className="font-medium text-gray-700">"{escapeHtml(sanitizeSearchInput(searchQuery))}"</span>
                 </p>
               )}
             </div>

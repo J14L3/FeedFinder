@@ -238,9 +238,16 @@ const FeedFinder = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && searchQuery.trim()) {
-                      setSearchResultsQuery(searchQuery.trim());
-                      setActiveTab('search');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      // Basic sanitization: remove HTML tags and limit length
+                      const sanitized = searchQuery.trim()
+                        .replace(/<[^>]*>/g, '')  // Remove HTML tags to prevent XSS
+                        .substring(0, 200);       // Limit length
+                      
+                      if (sanitized) {
+                        setSearchResultsQuery(sanitized);
+                        setActiveTab('search');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }
                     }
                   }}
                   className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm hover:shadow-md transition-all"

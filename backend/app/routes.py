@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename 
 import uuid
 import logging
+import html
 
 
 @app.route('/')
@@ -1368,29 +1369,63 @@ def api_public_posts():
         connection.close()
 
 # --- Search Posts ---
+def sanitize_search_query(query):
+    """
+    Sanitize search query to prevent XSS attacks.
+    Note: SQL injection is prevented by parameterized queries, so we focus on XSS prevention.
+    Allows common punctuation for better search functionality.
+    """
+    if not query:
+        return ""
+    
+    # Remove null bytes
+    query = query.replace('\x00', '')
+    
+    # Remove HTML/script tags to prevent XSS
+    sanitized = re.sub(r'<[^>]+>', '', query)
+    
+    # Remove control characters except spaces, newlines, and tabs
+    sanitized = re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]', '', sanitized)
+    
+    # Strip whitespace
+    sanitized = sanitized.strip()
+    
+    return sanitized
+
 @app.route("/api/posts/search", methods=["GET", "OPTIONS"])
 @optional_auth
 def api_search_posts():
     """
     Search posts by content_text (description).
     Returns public posts that match the search query.
+    Input is sanitized to prevent SQL injection and XSS attacks.
     """
     if request.method == 'OPTIONS':
         return '', 200
     
-    search_query = request.args.get("q", "").strip()
+    raw_query = request.args.get("q", "").strip()
     
-    if not search_query:
+    if not raw_query:
         return jsonify({
             "success": False,
             "message": "Search query is required"
         }), 400
     
     # Limit search query length to prevent abuse
-    if len(search_query) > 200:
+    if len(raw_query) > 200:
         return jsonify({
             "success": False,
             "message": "Search query too long (max 200 characters)"
+        }), 400
+    
+    # Sanitize the search query
+    search_query = sanitize_search_query(raw_query)
+    
+    # Check if sanitization removed everything (query was malicious)
+    if not search_query:
+        return jsonify({
+            "success": False,
+            "message": "Invalid search query. Please use only letters, numbers, and common punctuation."
         }), 400
     
     try:
