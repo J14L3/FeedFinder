@@ -11,6 +11,7 @@ import SettingsPage from './SettingsPage';
 import PremiumUpgrade from './PremiumUpgrade';
 import ProfilePage from './ProfilePage';
 import AdminPage from './AdminPage';
+import SearchResultsPage from './SearchResultsPage';
 
 // Load all images in the folder dynamically (Vite)
 const imageUrls = import.meta.glob('./assets/images/*.{png,jpg,jpeg,gif,webp,avif}', {
@@ -35,6 +36,7 @@ const FeedFinder = () => {
   const [showRatingModal, setShowRatingModal] = useState(null);
   const [showRegisterPage, setShowRegisterPage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResultsQuery, setSearchResultsQuery] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
@@ -236,6 +238,13 @@ const FeedFinder = () => {
                   placeholder="Search profiles, posts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      setSearchResultsQuery(searchQuery.trim());
+                      setActiveTab('search');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
                   className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm hover:shadow-md transition-all"
                 />
               </div>
@@ -294,7 +303,8 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {userRole && userRole.toLowerCase() === 'admin' && (
+                    {/* Only show Admin Panel if user role is exactly 'admin' */}
+                    {userRole && userRole.toLowerCase() === 'admin' ? (
                       <button
                         onClick={() => {
                           setActiveTab('admin');
@@ -305,7 +315,7 @@ const FeedFinder = () => {
                         <Shield size={18} />
                         Admin Panel
                       </button>
-                    )}
+                    ) : null}
                     {/* {!isPremium && (
                       <button
                         onClick={() => {
@@ -371,10 +381,24 @@ const FeedFinder = () => {
         ) : activeTab === 'admin' ? (
           <AdminPage />
         ) : activeTab === 'search' ? (
-          <div className="text-center py-12">
-            <Search size={48} className="mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">Search functionality coming soon...</p>
-          </div>
+          <SearchResultsPage
+            searchQuery={searchResultsQuery}
+            onBack={() => {
+              setActiveTab('home');
+              setSearchQuery('');
+              setSearchResultsQuery('');
+            }}
+            isLoggedIn={isLoggedIn}
+            isPremium={isPremium}
+            currentUserId={currentUserId}
+            setShowRatingModal={setShowRatingModal}
+            onAuthorClick={(author) => {
+              if (author?.user_id) {
+                setViewingProfile({ user_id: author.user_id });
+                setActiveTab('profile');
+              }
+            }}
+          />
           ) : activeTab === 'profile' ? (
            viewingProfile?.user_id || currentUserId ? (
              <ProfilePage
@@ -461,7 +485,18 @@ const FeedFinder = () => {
             <span className="text-xs">Create</span>
           </button>
           <button
-            onClick={() => setActiveTab('search')}
+            onClick={() => {
+              setActiveTab('search');
+              // If no search query, focus the search input after a short delay
+              if (!searchResultsQuery) {
+                setTimeout(() => {
+                  const searchInput = document.querySelector('input[placeholder="Search profiles, posts..."]');
+                  if (searchInput) {
+                    searchInput.focus();
+                  }
+                }, 100);
+              }
+            }}
             className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'search' ? 'text-blue-600' : 'text-gray-600'}`}
           >
             <Search size={24} />

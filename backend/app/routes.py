@@ -1336,6 +1336,91 @@ def api_public_posts():
         db_query.close()
         connection.close()
 
+# --- Search Posts ---
+@app.route("/api/posts/search", methods=["GET", "OPTIONS"])
+@optional_auth
+def api_search_posts():
+    """
+    Search posts by content_text (description).
+    Returns public posts that match the search query.
+    """
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    search_query = request.args.get("q", "").strip()
+    
+    if not search_query:
+        return jsonify({
+            "success": False,
+            "message": "Search query is required"
+        }), 400
+    
+    # Limit search query length to prevent abuse
+    if len(search_query) > 200:
+        return jsonify({
+            "success": False,
+            "message": "Search query too long (max 200 characters)"
+        }), 400
+    
+    try:
+        limit = int(request.args.get("limit", 50))
+        # guard-rail for large limits
+        limit = max(1, min(limit, 100))
+    except ValueError:
+        limit = 50
+
+    # Connect to DB
+    connection = get_db_connection()
+    if connection is None:
+        return jsonify({
+            "success": False,
+            "message": "Database connection failed."
+        }), 500
+
+    try:
+        db_query = connection.cursor(dictionary=True)
+        # Search in content_text (case-insensitive)
+        # Only return public posts for security
+        search_pattern = f"%{search_query}%"
+        db_query.execute(
+            """
+            SELECT 
+              p.post_id,
+              p.user_id,
+              p.content_text,
+              p.media_url,
+              p.media_type,
+              p.privacy,
+              p.created_at,
+              u.user_name,
+              u.user_email
+            FROM post p
+            JOIN user u ON u.user_id = p.user_id
+            WHERE p.privacy = 'public'
+              AND p.content_text LIKE %s
+            ORDER BY p.created_at DESC, p.post_id DESC
+            LIMIT %s
+            """,
+            (search_pattern, limit)
+        )
+        rows = db_query.fetchall()
+        
+        return jsonify({
+            "success": True,
+            "items": rows,
+            "query": search_query,
+            "count": len(rows)
+        })
+    except Exception as e:
+        print(f"Error searching posts: {e}")
+        return jsonify({
+            "success": False,
+            "message": "Error searching posts"
+        }), 500
+    finally:
+        db_query.close()
+        connection.close()
+
 # --- Likes & Comments ---
 # @app.route("/api/posts/<int:post_id>/like", methods=["POST"])  # body: { user_id }
 # def api_like_post(post_id):
