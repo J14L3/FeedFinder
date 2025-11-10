@@ -63,8 +63,14 @@ const FeedFinder = () => {
           }
           // Check both 'role' and 'user_role' fields, and handle empty strings
           const role = user.role || user.user_role;
+          console.log('Auth check - user object:', user);
+          console.log('Auth check - role:', role);
           if (role) {
             setUserRole(role);
+            console.log('Auth check - setUserRole called with:', role);
+          } else {
+            console.warn('Auth check - No role found in user object');
+            setUserRole(null);
           }
         }
       } catch (error) {
@@ -250,7 +256,25 @@ const FeedFinder = () => {
               </button>
               <div className="relative" ref={userMenuRef}>
                 <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={async () => {
+                    // Refresh user role when opening menu to ensure it's up-to-date
+                    if (!showUserMenu) {
+                      try {
+                        const { verifySession } = await import('./authService');
+                        const user = await verifySession();
+                        if (user) {
+                          const role = user.role || user.user_role;
+                          if (role) {
+                            setUserRole(role);
+                            console.log('Menu open - refreshed role:', role);
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error refreshing role:', error);
+                      }
+                    }
+                    setShowUserMenu(!showUserMenu);
+                  }}
                   className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-full transition-all border-2 border-gray-200 hover:border-blue-500 shadow-sm hover:shadow-md"
                 >
                   <img
@@ -295,7 +319,15 @@ const FeedFinder = () => {
                       <Settings size={18} />
                       Settings
                     </button>
-                    {userRole && userRole.toLowerCase() === 'admin' && (
+                    {(() => {
+                      const isAdmin = userRole && String(userRole).toLowerCase() === 'admin';
+                      console.log('Admin panel render check:', {
+                        userRole,
+                        isAdmin,
+                        userRoleType: typeof userRole
+                      });
+                      return isAdmin;
+                    })() && (
                       <button
                         onClick={() => {
                           setActiveTab('admin');
