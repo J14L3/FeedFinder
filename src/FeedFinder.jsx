@@ -73,12 +73,12 @@ const FeedFinder = () => {
             console.warn('Auth check - No role found in user object');
             setUserRole(null);
           }
+          setSessionReady(true);
         }
       } catch (error) {
         console.error('Error checking authentication:', error);
       } finally {
         setIsCheckingAuth(false);
-        setSessionReady(true);
       }
     };
     checkAuth();
