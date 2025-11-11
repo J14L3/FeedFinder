@@ -9,6 +9,7 @@ import RatingModal from './RatingModal';
 import { fetchProfile, fetchUserPosts, fetchProfileStats, updateProfile } from './profileService';
 import { authenticatedFetch } from './authService';
 import { API_BASE } from './config';
+import { verifySession } from './authService';
 
 const ProfilePage = ({
   userId = null,
@@ -49,7 +50,6 @@ const ProfilePage = ({
 
     const getCurrentUserId = async () => {
       try {
-        const { verifySession } = await import('./authService');
         const user = await verifySession();
         if (user && user.id) {
           setCurrentUserId(user.id);
