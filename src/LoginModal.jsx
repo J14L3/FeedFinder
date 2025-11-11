@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, LogIn, User, Lock } from 'lucide-react';
-import { login } from './authService';
+import { login, verifySession } from './authService';
 
 const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -50,7 +50,7 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
     setIsLoading(true);
     setMessage("");
     setErrors({});
-    
+
     if (!validateForm()) {
       setIsLoading(false);
       return;
@@ -58,19 +58,40 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
 
     const trimmedUsername = form.username.trim();
     const trimmedPassword = form.password.trim();
-    
+
     try {
       const { success, data } = await login(trimmedUsername, trimmedPassword);
-      
+
       if (success) {
         setMessage(data.message || "Login successful!");
         setIsError(false);
-        // Set logged in after a short delay
-        setTimeout(() => {
-          setIsLoggedIn(true);
-          setForm({ username: "", password: "" });
-          setMessage("");
-        }, 1000);
+
+        // Wait briefly for cookie/session to be set
+        setTimeout(async () => {
+          try {
+            const user = await verifySession();
+            if (user && user.id) {
+              console.log("Session verified:", user.id);
+              setIsLoggedIn(true);
+            } else {
+              console.warn("Session not ready yet, retrying...");
+              // Retry after another short delay
+              setTimeout(async () => {
+                const retryUser = await verifySession();
+                if (retryUser && retryUser.id) {
+                  setIsLoggedIn(true);
+                } else {
+                  setMessage("Session verification failed. Please refresh.");
+                }
+              }, 800);
+            }
+          } catch (err) {
+            console.error("verifySession failed:", err);
+            setMessage("Could not verify session. Please refresh.");
+          } finally {
+            setForm({ username: "", password: "" });
+          }
+        }, 300); // 300ms delay to ensure cookie is set
       } else {
         setMessage(data.message || "Login failed. Please check your credentials and try again.");
         setIsError(true);
@@ -110,11 +131,10 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
           <form onSubmit={handleSubmit} className="space-y-5">
             {message && (
               <div
-                className={`p-4 rounded-xl text-sm font-medium ${
-                  isError 
-                    ? "bg-red-50 text-red-700 border border-red-200" 
+                className={`p-4 rounded-xl text-sm font-medium ${isError
+                    ? "bg-red-50 text-red-700 border border-red-200"
                     : "bg-green-50 text-green-700 border border-green-200"
-                }`}
+                  }`}
               >
                 {message}
               </div>
@@ -132,9 +152,8 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
                 <input
                   type="text"
                   placeholder="Enter your username"
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
-                    errors.username ? 'border-red-500' : 'border-gray-200'
-                  }`}
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${errors.username ? 'border-red-500' : 'border-gray-200'
+                    }`}
                   value={form.username}
                   onChange={(e) => {
                     setForm({ ...form, username: e.target.value });
@@ -163,9 +182,8 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
                 <input
                   type="password"
                   placeholder="Enter your password"
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${
-                    errors.password ? 'border-red-500' : 'border-gray-200'
-                  }`}
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white ${errors.password ? 'border-red-500' : 'border-gray-200'
+                    }`}
                   value={form.password}
                   onChange={(e) => {
                     setForm({ ...form, password: e.target.value });
