@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Home, PlusSquare, User, Star, Crown, LogOut, Settings, Shield } from 'lucide-react';
-import { API_BASE } from './config'; 
+import { API_BASE } from './config';
 import CreatePostModal from './CreatePostModal';
 import RatingModal from './RatingModal';
 import LoginPage from './LoginModal';
@@ -26,7 +26,7 @@ const imagesByName = Object.fromEntries(
 
 const inferMediaType = (url = "") => {
   const ext = url.split(".").pop()?.toLowerCase() || "";
-  if (["mp4","mov","webm"].includes(ext)) return "video";
+  if (["mp4", "mov", "webm"].includes(ext)) return "video";
   return "image";
 };
 
@@ -84,12 +84,15 @@ const FeedFinder = () => {
     checkAuth();
   }, []);
 
-  if (!sessionReady) {
+  // Only block authenticated pages
+  const protectedPages = ['profile', 'settings', 'create'];
+
+  if (protectedPages.includes(activePage) && !sessionReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Initializing session...</p>
+          <p className="text-gray-600">Loading your session...</p>
         </div>
       </div>
     );
@@ -126,41 +129,41 @@ const FeedFinder = () => {
             throw new Error(data?.message || 'Failed to load posts');
           }
 
-           // Helper function to format timestamp
-           const formatTimestamp = (timestamp) => {
-             if (!timestamp) return 'Just now';
-             const date = new Date(timestamp);
-             const now = new Date();
-             const diffInSeconds = Math.floor((now - date) / 1000);
-             
-             if (diffInSeconds < 60) return 'Just now';
-             if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-             if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-             if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-           };
+          // Helper function to format timestamp
+          const formatTimestamp = (timestamp) => {
+            if (!timestamp) return 'Just now';
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
 
-           // Map backend rows into PostCards format
-           const mapped = data.items.map(p => ({
-             id: p.post_id,
-             author: {
-               user_id: p.user_id,
-               name: p.user_name || 'User',
-               username: p.user_email ? `@${p.user_email.split('@')[0]}` : `@${p.user_name || 'user'}`,
-               avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (p.user_name || 'User'),
-               rating: 0,
-               verified: false,
-               isPremium: false,
-               email : p.user_email
-             },
-             type: p.media_type || (p.media_url ? inferMediaType(p.media_url) : 'image'),
-             content: p.media_url || '',
-             caption: p.content_text || '',
-             timestamp: p.created_at ? formatTimestamp(p.created_at) : 'Just now',
-             likes: 0,
-             comments: 0,
-             isExclusive: p.privacy === 'exclusive'
-           }));
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          };
+
+          // Map backend rows into PostCards format
+          const mapped = data.items.map(p => ({
+            id: p.post_id,
+            author: {
+              user_id: p.user_id,
+              name: p.user_name || 'User',
+              username: p.user_email ? `@${p.user_email.split('@')[0]}` : `@${p.user_name || 'user'}`,
+              avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (p.user_name || 'User'),
+              rating: 0,
+              verified: false,
+              isPremium: false,
+              email: p.user_email
+            },
+            type: p.media_type || (p.media_url ? inferMediaType(p.media_url) : 'image'),
+            content: p.media_url || '',
+            caption: p.content_text || '',
+            timestamp: p.created_at ? formatTimestamp(p.created_at) : 'Just now',
+            likes: 0,
+            comments: 0,
+            isExclusive: p.privacy === 'exclusive'
+          }));
 
           setPosts(mapped);
         } catch (err) {
@@ -255,7 +258,7 @@ const FeedFinder = () => {
                       const sanitized = searchQuery.trim()
                         .replace(/<[^>]*>/g, '')  // Remove HTML tags to prevent XSS
                         .substring(0, 200);       // Limit length
-                      
+
                       if (sanitized) {
                         setSearchResultsQuery(sanitized);
                         setActiveTab('search');
@@ -314,17 +317,17 @@ const FeedFinder = () => {
                       <PlusSquare size={18} />
                       Create
                     </button>
-                     <button 
-                       onClick={() => {
-                         setViewingProfile(null);
-                         setActiveTab('profile');
-                         setShowUserMenu(false);
-                       }}
-                       className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
-                     >
-                       <User size={18} />
-                       Profile
-                     </button>
+                    <button
+                      onClick={() => {
+                        setViewingProfile(null);
+                        setActiveTab('profile');
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-gray-900"
+                    >
+                      <User size={18} />
+                      Profile
+                    </button>
                     <button
                       onClick={() => {
                         setActiveTab('settings');
@@ -344,17 +347,17 @@ const FeedFinder = () => {
                       });
                       return isAdmin;
                     })() && (
-                      <button
-                        onClick={() => {
-                          setActiveTab('admin');
-                          setShowUserMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
-                      >
-                        <Shield size={18} />
-                        Admin Panel
-                      </button>
-                    )}
+                        <button
+                          onClick={() => {
+                            setActiveTab('admin');
+                            setShowUserMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                        >
+                          <Shield size={18} />
+                          Admin Panel
+                        </button>
+                      )}
                     {/* {!isPremium && (
                       <button
                         onClick={() => {
@@ -418,7 +421,7 @@ const FeedFinder = () => {
         ) : activeTab === 'premium' ? (
           <PremiumUpgrade setIsPremium={setIsPremium} setActiveTab={setActiveTab} />
         ) : activeTab === 'admin' ? (
-          <AdminPage 
+          <AdminPage
             onBack={() => {
               setActiveTab('home');
             }}
@@ -442,28 +445,28 @@ const FeedFinder = () => {
               }
             }}
           />
-          ) : activeTab === 'profile' ? (
-           viewingProfile?.user_id || currentUserId ? (
-             <ProfilePage
-               userId={viewingProfile?.user_id || currentUserId}
-               isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
-               isLoggedIn={isLoggedIn}
-               isPremium={isPremium}
-               currentUserId={currentUserId}
-               setShowRatingModal={setShowRatingModal}
-               onBack={() => {
-                 setViewingProfile(null);
-                 setActiveTab('home');
-               }}
-             />
-           ) : (
-             <div className="text-center py-12">
-               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <p className="text-gray-600">Loading profile...</p>
-             </div>
-           )
+        ) : activeTab === 'profile' ? (
+          viewingProfile?.user_id || currentUserId ? (
+            <ProfilePage
+              userId={viewingProfile?.user_id || currentUserId}
+              isOwnProfile={!viewingProfile || viewingProfile.user_id === currentUserId}
+              isLoggedIn={isLoggedIn}
+              isPremium={isPremium}
+              currentUserId={currentUserId}
+              setShowRatingModal={setShowRatingModal}
+              onBack={() => {
+                setViewingProfile(null);
+                setActiveTab('home');
+              }}
+            />
           ) : (
-          <>    
+            <div className="text-center py-12">
+              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading profile...</p>
+            </div>
+          )
+        ) : (
+          <>
             {
               loadingFeed ? (
                 <div className="text-center py-12">
@@ -480,27 +483,27 @@ const FeedFinder = () => {
                   <p className="text-gray-600">No public posts available</p>
                 </div>
               ) : (
-                 filteredPosts.map(post => (
-                   <PostCards
-                     key={post.id}
-                     post={post}
-                     setShowRatingModal={setShowRatingModal}
-                     currentUserId={currentUserId} 
-                     isLoggedIn={isLoggedIn}
-                     isPremium={isPremium}
-                     onAuthorClick={() => {
-                       if (post.author?.user_id) {
-                         setViewingProfile({ user_id: post.author.user_id });
-                         setActiveTab('profile');
-                       }
-                     }}
-                   />
-                 ))
-               )
-             }
-           </>
-          )}
-        </main>
+                filteredPosts.map(post => (
+                  <PostCards
+                    key={post.id}
+                    post={post}
+                    setShowRatingModal={setShowRatingModal}
+                    currentUserId={currentUserId}
+                    isLoggedIn={isLoggedIn}
+                    isPremium={isPremium}
+                    onAuthorClick={() => {
+                      if (post.author?.user_id) {
+                        setViewingProfile({ user_id: post.author.user_id });
+                        setActiveTab('profile');
+                      }
+                    }}
+                  />
+                ))
+              )
+            }
+          </>
+        )}
+      </main>
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-2 border-gray-300 shadow-2xl z-30">
@@ -561,7 +564,7 @@ const FeedFinder = () => {
 
       {/* Modals */}
       {showCreateModal && <CreatePostModal setShowCreateModal={setShowCreateModal} />}
-      {showRatingModal && <RatingModal post={showRatingModal} setShowRatingModal={setShowRatingModal} currentUserId={currentUserId}/>}
+      {showRatingModal && <RatingModal post={showRatingModal} setShowRatingModal={setShowRatingModal} currentUserId={currentUserId} />}
     </div>
   );
 };
