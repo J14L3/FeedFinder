@@ -41,6 +41,8 @@ const ProfilePage = ({
   const [error, setError] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(propCurrentUserId);
 
+  const subjectUserId = userId || currentUserId;
+
   // Get current user ID if not provided as prop
   useEffect(() => {
     if (propCurrentUserId) {
@@ -61,94 +63,190 @@ const ProfilePage = ({
     getCurrentUserId();
   }, [propCurrentUserId]);
 
-  // Fetch profile data from database
+  // // Fetch profile data from database
+  // useEffect(() => {
+  //   const loadProfileData = async () => {
+  //     if (!userId) {
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     setLoading(true);
+  //     setError(null);
+
+  //     // Add timeout to prevent infinite loading
+  //     const timeoutId = setTimeout(() => {
+  //       setError('Request timed out. Please try again.');
+  //       setLoading(false);
+  //     }, 15000); // 15 second timeout
+
+  //     try {
+  //       // Fetch profile
+  //       const profileData = await fetchProfile(userId);
+
+  //       if (profileData) {
+  //         setUserProfile(profileData);
+  //         setEditBio(profileData.bio || '');
+
+  //         // Fetch profile statistics and posts in parallel with timeout
+  //         const statsPromise = (async () => {
+  //           try {
+  //             const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
+  //               method: 'GET',
+  //             });
+  //             if (statsResponse.ok) {
+  //               const statsData = await statsResponse.json();
+  //               if (statsData.stats) {
+  //                 return statsData.stats;
+  //               }
+  //             }
+  //             // Fallback to basic stats
+  //             return await fetchProfileStats(userId, profileData.user_email);
+  //           } catch (err) {
+  //             console.error('Error fetching stats:', err);
+  //             // Fallback to basic stats
+  //             return await fetchProfileStats(userId, profileData.user_email);
+  //           }
+  //         })();
+
+  //         // Fetch posts - currentUserId is used by backend to determine if viewing own posts
+  //         // If currentUserId is null, backend will only return public posts
+  //         const postsPromise = fetchUserPosts(userId, currentUserId);
+  //         console.log('ProfilePage: Fetching posts with userId:', userId, 'currentUserId:', currentUserId);
+
+  //         // Use Promise.race with timeout to prevent hanging
+  //         const timeoutPromise = new Promise((_, reject) =>
+  //           setTimeout(() => reject(new Error('Request timeout')), 10000)
+  //         );
+
+  //         const [statsResult, posts] = await Promise.all([
+  //           Promise.race([statsPromise, timeoutPromise]).catch(() => {
+  //             // Return default stats on timeout
+  //             return {
+  //               totalPosts: 0,
+  //               totalLikes: 0,
+  //               totalComments: 0,
+  //               totalRatings: 0,
+  //               averageRating: 0,
+  //               followers: 0,
+  //               following: 0
+  //             };
+  //           }),
+  //           Promise.race([postsPromise, timeoutPromise]).catch((err) => {
+  //             console.error('Error fetching posts (timeout or error):', err);
+  //             return [];
+  //           })
+  //         ]);
+
+  //         clearTimeout(timeoutId);
+
+  //         console.log('ProfilePage: Posts received:', posts);
+  //         console.log('ProfilePage: Posts count:', Array.isArray(posts) ? posts.length : 'Not an array');
+
+  //         // Set stats
+  //         setStats(statsResult);
+
+  //         // Transform posts to match PostCards format
+  //         const transformedPosts = Array.isArray(posts) ? posts.map(post => ({
+  //           id: post.post_id,
+  //           author: {
+  //             user_id: userId,
+  //             name: profileData.user_name,
+  //             username: `@${profileData.user_name}`,
+  //             email: profileData.user_email,
+  //             avatar: profileData.profile_picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.user_name}`,
+  //             rating: parseFloat(statsResult.averageRating) || 0,
+  //             verified: false,
+  //             isPremium: profileData.is_premium || false
+  //           },
+  //           type: post.media_url ? (post.media_url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image') : 'text',
+  //           content: post.media_url || '',
+  //           caption: post.content_text || '',
+  //           timestamp: post.created_at ? formatTimestamp(post.created_at) : 'Just now',
+  //           likes: post.like_count || 0,
+  //           comments: 0,
+  //           isExclusive: post.privacy === 'exclusive'
+  //         })) : [];
+
+  //         console.log('ProfilePage: Transformed posts count:', transformedPosts.length);
+  //         setUserPosts(transformedPosts);
+  //       } else {
+  //         clearTimeout(timeoutId);
+  //         setError('Profile not found');
+  //       }
+  //     } catch (err) {
+  //       clearTimeout(timeoutId);
+  //       console.error('Error loading profile:', err);
+  //       setError(err.message || 'Failed to load profile. Please try again.');
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
+
+  //   if (userId) {
+  //     loadProfileData();
+  //   } else {
+  //     setLoading(false);
+  //   }
+  // }, [userId, currentUserId]);
+
   useEffect(() => {
     const loadProfileData = async () => {
-      if (!userId) {
+      if (!subjectUserId) { 
         setLoading(false);
         return;
       }
-
+  
       setLoading(true);
       setError(null);
-
-      // Add timeout to prevent infinite loading
+  
       const timeoutId = setTimeout(() => {
         setError('Request timed out. Please try again.');
         setLoading(false);
-      }, 15000); // 15 second timeout
-
+      }, 15000);
+  
       try {
-        // Fetch profile
-        const profileData = await fetchProfile(userId);
-
+        const profileData = await fetchProfile(subjectUserId);
+  
         if (profileData) {
           setUserProfile(profileData);
           setEditBio(profileData.bio || '');
-
-          // Fetch profile statistics and posts in parallel with timeout
+  
           const statsPromise = (async () => {
             try {
-              const statsResponse = await authenticatedFetch(`${API_BASE}/api/profile/${userId}/stats`, {
-                method: 'GET',
-              });
-              if (statsResponse.ok) {
-                const statsData = await statsResponse.json();
-                if (statsData.stats) {
-                  return statsData.stats;
-                }
+              const res = await authenticatedFetch(`${API_BASE}/api/profile/${subjectUserId}/stats`, { method: 'GET' });
+              if (res.ok) {
+                const statsData = await res.json();
+                if (statsData.stats) return statsData.stats;
               }
-              // Fallback to basic stats
-              return await fetchProfileStats(userId, profileData.user_email);
-            } catch (err) {
-              console.error('Error fetching stats:', err);
-              // Fallback to basic stats
-              return await fetchProfileStats(userId, profileData.user_email);
+              return await fetchProfileStats(subjectUserId, profileData.user_email);
+            } catch {
+              return await fetchProfileStats(subjectUserId, profileData.user_email);
             }
           })();
-
-          // Fetch posts - currentUserId is used by backend to determine if viewing own posts
-          // If currentUserId is null, backend will only return public posts
-          const postsPromise = fetchUserPosts(userId, currentUserId);
-          console.log('ProfilePage: Fetching posts with userId:', userId, 'currentUserId:', currentUserId);
-
-          // Use Promise.race with timeout to prevent hanging
+  
+          const postsPromise = fetchUserPosts(subjectUserId, currentUserId);
+  
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Request timeout')), 10000)
           );
-
+  
           const [statsResult, posts] = await Promise.all([
-            Promise.race([statsPromise, timeoutPromise]).catch(() => {
-              // Return default stats on timeout
-              return {
-                totalPosts: 0,
-                totalLikes: 0,
-                totalComments: 0,
-                totalRatings: 0,
-                averageRating: 0,
-                followers: 0,
-                following: 0
-              };
-            }),
-            Promise.race([postsPromise, timeoutPromise]).catch((err) => {
-              console.error('Error fetching posts (timeout or error):', err);
-              return [];
-            })
+            Promise.race([statsPromise, timeoutPromise]).catch(() => ({
+              totalPosts: 0, totalLikes: 0, totalComments: 0,
+              totalRatings: 0, averageRating: 0, followers: 0, following: 0
+            })),
+            Promise.race([postsPromise, timeoutPromise]).catch(() => [])
           ]);
-
+  
           clearTimeout(timeoutId);
-
-          console.log('ProfilePage: Posts received:', posts);
-          console.log('ProfilePage: Posts count:', Array.isArray(posts) ? posts.length : 'Not an array');
-
-          // Set stats
+  
           setStats(statsResult);
-
-          // Transform posts to match PostCards format
-          const transformedPosts = Array.isArray(posts) ? posts.map(post => ({
+  
+          const transformed = Array.isArray(posts) ? posts.map(post => ({
             id: post.post_id,
             author: {
-              user_id: userId,
+              user_id: subjectUserId,
               name: profileData.user_name,
               username: `@${profileData.user_name}`,
               email: profileData.user_email,
@@ -157,7 +255,7 @@ const ProfilePage = ({
               verified: false,
               isPremium: profileData.is_premium || false
             },
-            type: post.media_url ? (post.media_url.match(/\.(mp4|webm|mov)$/i) ? 'video' : 'image') : 'text',
+            type: post.media_url ? (/\.(mp4|webm|mov)$/i.test(post.media_url) ? 'video' : 'image') : 'text',
             content: post.media_url || '',
             caption: post.content_text || '',
             timestamp: post.created_at ? formatTimestamp(post.created_at) : 'Just now',
@@ -165,28 +263,23 @@ const ProfilePage = ({
             comments: 0,
             isExclusive: post.privacy === 'exclusive'
           })) : [];
-
-          console.log('ProfilePage: Transformed posts count:', transformedPosts.length);
-          setUserPosts(transformedPosts);
+  
+          setUserPosts(transformed);
         } else {
           clearTimeout(timeoutId);
           setError('Profile not found');
         }
       } catch (err) {
         clearTimeout(timeoutId);
-        console.error('Error loading profile:', err);
         setError(err.message || 'Failed to load profile. Please try again.');
       } finally {
         setLoading(false);
       }
     };
-
-    if (userId) {
-      loadProfileData();
-    } else {
-      setLoading(false);
-    }
-  }, [userId, currentUserId]);
+  
+    loadProfileData();
+  }, [subjectUserId, currentUserId]);
+  
 
   // Format timestamp helper
   const formatTimestamp = (timestamp) => {
