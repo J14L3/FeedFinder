@@ -85,9 +85,9 @@ const FeedFinder = () => {
   }, []);
 
   // Only block authenticated pages
-  const protectedPages = ['profile', 'settings', 'create'];
+  const protectedPages = ['profile', 'settings', 'upload', 'admin'];
 
-  if (protectedPages.includes(activePage) && !sessionReady) {
+  if (protectedPages.includes(activeTab) && !sessionReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
