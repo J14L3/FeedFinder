@@ -79,6 +79,7 @@ const FeedFinder = () => {
         console.error('Error checking authentication:', error);
       } finally {
         setIsCheckingAuth(false);
+        setSessionReady(true);
       }
     };
     checkAuth();
