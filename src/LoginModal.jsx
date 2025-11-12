@@ -75,7 +75,7 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
               setIsLoggedIn(true);
               setTimeout(() => {
                 window.location.reload(); // refresh page for cookies to kick in
-              }, 100);
+              }, 50);
             } else {
               console.warn("Session not ready yet, retrying...");
               // Retry after another short delay
