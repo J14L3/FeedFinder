@@ -73,6 +73,9 @@ const LoginPage = ({ setShowRegisterModal, setIsLoggedIn }) => {
             if (user && user.id) {
               console.log("Session verified:", user.id);
               setIsLoggedIn(true);
+              setTimeout(() => {
+                window.location.reload(); // refresh page for cookies to kick in
+              }, 300);
             } else {
               console.warn("Session not ready yet, retrying...");
               // Retry after another short delay
